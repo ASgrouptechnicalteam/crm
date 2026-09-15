@@ -435,7 +435,20 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       case 'SUPER_BUILT_UP':
         return form.super_built_up_area_sqft || 0;
       case 'PLOT_AREA':
-        return (form.plot_area_sqyd || 0) * 9;
+        if (form.plot_area_sqyd) return form.plot_area_sqyd * 9;
+        if (form.area_value && form.area_unit) {
+          const val = form.area_value;
+          const u = form.area_unit;
+          if (u === 'ACRE') return val * 43560;
+          if (u === 'GUNTA') return val * 1089;
+          if (u === 'CENT') return val * 435.6;
+          if (u === 'ANKANAM') return val * 72;
+          if (u === 'HECTARE') return val * 107639.1;
+          if (u === 'SQM') return val * 10.7639;
+          if (u === 'SQYD') return val * 9;
+          if (u === 'SQFT') return val;
+        }
+        return form.area_sqft || 0;
       case 'LUMPSUM':
       default:
         return 0;
