@@ -458,20 +458,23 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
   const deriveOverallAreaSqft = (): number => {
     const cat = form.category;
-    if (['APARTMENT', 'COMMERCIAL_OFFICE', 'COMMERCIAL_SHOP'].includes(cat)) {
-      return form.super_built_up_area_sqft || form.built_up_area_sqft || form.carpet_area_sqft || 0;
-    }
     if (
       [
-        'PLOT',
-        'VILLA',
-        'INDEPENDENT_HOUSE',
-        'FARM_HOUSE',
-        'INDEPENDENT_FLOOR',
-        'DUPLEX',
+        'APARTMENT',
         'STUDIO',
+        'PENTHOUSE',
+        'INDEPENDENT_FLOOR',
+        'COMMERCIAL_OFFICE',
+        'COMMERCIAL_SHOP',
       ].includes(cat)
     ) {
+      return form.super_built_up_area_sqft || form.built_up_area_sqft || form.carpet_area_sqft || 0;
+    }
+    if (['VILLA', 'INDEPENDENT_HOUSE', 'DUPLEX'].includes(cat)) {
+      if (form.plot_area_sqyd) return form.plot_area_sqyd * 9;
+      return form.built_up_area_sqft || form.ground_floor_area_sqft || 0;
+    }
+    if (['PLOT', 'FARM_HOUSE'].includes(cat)) {
       return (form.plot_area_sqyd || 0) * 9;
     }
     if (['AGRICULTURAL_LAND'].includes(cat)) {
