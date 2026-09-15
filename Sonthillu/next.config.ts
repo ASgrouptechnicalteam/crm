@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // Actions, no cookies(), no dynamic Route Handlers. `next build` now
   // writes a plain HTML/CSS/JS site to ./out.
   output: 'export',
-  trailingSlash: true,
+  trailingSlash: false,
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '**.onrender.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.radharealhomeproperties.com',
       },
       // Local CRM dev server — property/project images uploaded there are
       // served from its own origin (apps/api's express.static uploads
