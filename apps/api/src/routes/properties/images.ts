@@ -4,7 +4,7 @@ import { Response, NextFunction, Router } from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../../middleware/auth';
 import { requireAuthz } from '../../middleware/authz';
 import { PropertyImageMetadataSchema, EmptyBodySchema, Permissions } from '../../shared';
-import { getAccessibleCompanyIds } from '../../authz/dataScope';
+import { buildPropertyScope } from '../../authz/dataScope';
 import { validateRequestBody } from '../../middleware/validate';
 import { propertyImageUpload, getPropertyImageStorage } from '../../services/storage.service';
 import { Prisma } from '@prisma/client';
@@ -31,13 +31,11 @@ router.post(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(propertyId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      const companyId = req.user!.companyId;
-
-      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+      const propertyScope = await buildPropertyScope(req.user!);
 
       // Verify property exists and belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
+        where: { id: propertyId, ...propertyScope },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
@@ -110,13 +108,11 @@ router.put(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(imageId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      const companyId = req.user!.companyId;
-
-      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+      const propertyScope = await buildPropertyScope(req.user!);
 
       // Verify property belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
+        where: { id: propertyId, ...propertyScope },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
@@ -190,13 +186,11 @@ router.delete(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(imageId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      const companyId = req.user!.companyId;
-
-      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+      const propertyScope = await buildPropertyScope(req.user!);
 
       // Verify property belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
+        where: { id: propertyId, ...propertyScope },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
@@ -271,13 +265,13 @@ router.post(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(imageId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      const companyId = req.user!.companyId;
+      const propertyScope = await buildPropertyScope(req.user!);
 
       const image = await p.propertyImage.findFirst({
         where: {
           id: imageId,
           property_id: propertyId,
-          property: { company_id: companyId },
+          property: propertyScope,
         },
       });
       if (!image) {
@@ -326,13 +320,13 @@ router.post(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(imageId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      const companyId = req.user!.companyId;
+      const propertyScope = await buildPropertyScope(req.user!);
 
       const image = await p.propertyImage.findFirst({
         where: {
           id: imageId,
           property_id: propertyId,
-          property: { company_id: companyId },
+          property: propertyScope,
         },
       });
       if (!image) {
