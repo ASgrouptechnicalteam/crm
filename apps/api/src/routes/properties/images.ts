@@ -4,6 +4,7 @@ import { Response, NextFunction, Router } from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../../middleware/auth';
 import { requireAuthz } from '../../middleware/authz';
 import { PropertyImageMetadataSchema, EmptyBodySchema, Permissions } from '../../shared';
+import { getAccessibleCompanyIds } from '../../authz/dataScope';
 import { validateRequestBody } from '../../middleware/validate';
 import { propertyImageUpload, getPropertyImageStorage } from '../../services/storage.service';
 import { Prisma } from '@prisma/client';
@@ -32,9 +33,11 @@ router.post(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       const companyId = req.user!.companyId;
 
-      // Verify property exists and belongs to company
+      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+
+      // Verify property exists and belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: companyId },
+        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
@@ -109,9 +112,11 @@ router.put(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       const companyId = req.user!.companyId;
 
-      // Verify property belongs to company
+      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+
+      // Verify property belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: companyId },
+        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
@@ -187,9 +192,11 @@ router.delete(
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       const companyId = req.user!.companyId;
 
-      // Verify property belongs to company
+      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!);
+
+      // Verify property belongs to a company the user can access
       const property = await p.property.findFirst({
-        where: { id: propertyId, company_id: companyId },
+        where: { id: propertyId, company_id: { in: accessibleCompanyIds } },
       });
       if (!property) {
         return res.status(404).json({ error: 'Property not found or unauthorized' });
