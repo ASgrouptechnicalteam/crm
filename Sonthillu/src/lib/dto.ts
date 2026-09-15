@@ -16,8 +16,15 @@ import type {
  * Transform CRM Property to PublicProperty DTO.
  * Excludes: seller data, internal notes, exact coordinates, workflow state.
  */
-export function toPublicProperty(property: Property): PublicProperty {
-  const primaryImage = property.images?.find((img) => img.is_primary);
+export function toPublicProperty(property: any): PublicProperty {
+  // If the backend hasn't been updated yet and is returning MatchCandidate,
+  // we must avoid crashing (especially in mapCategoryToPropertyType which expects a string).
+  // A MatchCandidate has `priceFormatted` but no `title` or `category`.
+  if ('priceFormatted' in property && !property.title && !property.category) {
+    return property as PublicProperty; // pass it through
+  }
+
+  const primaryImage = property.images?.find((img: any) => img.is_primary);
   const allImages = property.images || [];
 
   return {
