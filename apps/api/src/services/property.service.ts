@@ -682,6 +682,26 @@ export class PropertyService {
           logger.error(`Error triggering lead recovery for property ${updatedProperty.id}:`, err),
         );
       });
+      // Auto-publish to company website when property goes LIVE
+      p.propertyPublication
+        .upsert({
+          where: {
+            property_id_company_id: {
+              property_id: updatedProperty.id,
+              company_id: updatedProperty.company_id,
+            },
+          },
+          update: { is_published: true, published_at: new Date() },
+          create: {
+            property_id: updatedProperty.id,
+            company_id: updatedProperty.company_id,
+            is_published: true,
+            published_at: new Date(),
+          },
+        })
+        .catch((err: any) =>
+          logger.error(`Auto-publish failed for property ${updatedProperty.id}:`, err),
+        );
     }
 
     // Notify if PM changed via the edit form
@@ -1280,6 +1300,21 @@ export class PropertyService {
           logger.error(`Error triggering lead recovery for property ${result.id}:`, err),
         );
       });
+      // Auto-publish to company website when MD approves property as LIVE
+      p.propertyPublication
+        .upsert({
+          where: {
+            property_id_company_id: { property_id: result.id, company_id: result.company_id },
+          },
+          update: { is_published: true, published_at: new Date() },
+          create: {
+            property_id: result.id,
+            company_id: result.company_id,
+            is_published: true,
+            published_at: new Date(),
+          },
+        })
+        .catch((err: any) => logger.error(`Auto-publish failed for property ${result.id}:`, err));
     }
 
     return result;

@@ -180,6 +180,7 @@ export class ProjectService {
             amenities: data.amenities || null,
             assigned_pm_id: data.assigned_pm_id || null,
             status: 'PLANNING',
+            is_published: true, // Auto-publish: new projects appear on website immediately
             slug,
             ...mapCommonProjectFields(data),
           },
