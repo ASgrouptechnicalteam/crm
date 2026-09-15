@@ -185,7 +185,10 @@ export const RolePermissionsMatrix: Record<RoleName, string[]> = {
     Permissions.EMPLOYEES_VIEW_SENSITIVE,
     Permissions.ATTENDANCE_PROPOSALS_QUEUE,
     Permissions.ATTENDANCE_LIVE_MONITOR,
-    Permissions.ATTENDANCE_MANAGE,
+    // ATTENDANCE_MANAGE deliberately excluded (2026-09-15): direct
+    // create/edit/delete of attendance records is MD/Admin-only now, per
+    // product decision — HR still gets the read-only live monitor and the
+    // proposals queue above.
     Permissions.TASKS_CREATE,
     Permissions.TASKS_READ,
     Permissions.TASKS_UPDATE,

@@ -26,18 +26,41 @@ export const CPMDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [tomorrowVisits, setTomorrowVisits] = useState<ListItem[]>([]);
   const [whatsappTasks, setWhatsappTasks] = useState(0);
-  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  // A Set (not a single id) so opening one lead's "Update Status" menu doesn't
+  // force-close any other lead's menu that's already open.
+  const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
   const [selectedLead, setSelectedLead] = useState<LeadListItem | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [qualifyingLead, setQualifyingLead] = useState<LeadListItem | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = () => setActiveDropdown(null);
-    if (activeDropdown !== null) {
+    const handleClickOutside = () => setOpenDropdowns(new Set());
+    if (openDropdowns.size > 0) {
       document.addEventListener('click', handleClickOutside);
     }
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [activeDropdown]);
+  }, [openDropdowns]);
+
+  const toggleDropdown = (leadId: number) => {
+    setOpenDropdowns((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) {
+        next.delete(leadId);
+      } else {
+        next.add(leadId);
+      }
+      return next;
+    });
+  };
+
+  const closeDropdown = (leadId: number) => {
+    setOpenDropdowns((prev) => {
+      if (!prev.has(leadId)) return prev;
+      const next = new Set(prev);
+      next.delete(leadId);
+      return next;
+    });
+  };
 
   const updateLeadStatus = async (
     leadId: number,
@@ -324,7 +347,7 @@ export const CPMDashboard: React.FC = () => {
                           variant="action"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveDropdown(activeDropdown === lead.id ? null : lead.id);
+                            toggleDropdown(lead.id);
                           }}
                           disabled={lead.can_edit === false}
                           className="flex items-center gap-1"
@@ -333,7 +356,7 @@ export const CPMDashboard: React.FC = () => {
                           <ChevronDown className="w-3.5 h-3.5" />
                         </Button>
 
-                        {activeDropdown === lead.id && (
+                        {openDropdowns.has(lead.id) && (
                           <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-100 py-1 z-10 flex flex-col overflow-hidden">
                             {(lead.status === 'NEW' || lead.status === 'ASSIGNED') && (
                               <button
@@ -341,7 +364,7 @@ export const CPMDashboard: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   updateLeadStatus(lead.id, 'CONTACTED');
-                                  setActiveDropdown(null);
+                                  closeDropdown(lead.id);
                                 }}
                               >
                                 Mark Contacted
@@ -353,7 +376,7 @@ export const CPMDashboard: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setQualifyingLead(lead);
-                                  setActiveDropdown(null);
+                                  closeDropdown(lead.id);
                                 }}
                               >
                                 Mark Qualified
@@ -379,7 +402,7 @@ export const CPMDashboard: React.FC = () => {
                                   setSelectedLead(lead);
                                   setScheduleModalOpen(true);
                                 }
-                                setActiveDropdown(null);
+                                closeDropdown(lead.id);
                               }}
                             >
                               Schedule Site Visit
