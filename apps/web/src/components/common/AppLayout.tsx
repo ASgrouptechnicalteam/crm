@@ -383,13 +383,6 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     ],
   },
   {
-    id: 'system-control',
-    label: 'System Control',
-    icon: Settings2,
-    path: '/system-control',
-    requiredPermission: Permissions.ADMIN_SYSTEM_METRICS,
-  },
-  {
     id: 'pm-territories',
     label: 'PM Territories',
     icon: Map,

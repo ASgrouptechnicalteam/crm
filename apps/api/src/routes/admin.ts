@@ -5,6 +5,7 @@ import { authenticateToken, AuthenticatedRequest, requireRole } from '../middlew
 import { Roles, Permissions } from '../shared';
 import permissionsRouter from './admin/permissions';
 import attendanceRouter from './admin/attendance';
+import companiesRouter from './admin/companies';
 
 const router = Router();
 const p = prisma;
@@ -14,6 +15,9 @@ router.use('/', permissionsRouter);
 
 // Mount attendance correction router
 router.use('/', attendanceRouter);
+
+// Mount company/branch management router
+router.use('/', companiesRouter);
 
 /**
  * Technical Admin restricted routes for deep telemetry, auditing, and emergency controls.

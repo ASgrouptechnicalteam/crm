@@ -185,9 +185,6 @@ const DailyReportingPage = lazy(() =>
     default: m.DailyReportingPage,
   })),
 );
-const SystemControlHub = lazy(() =>
-  import('./components/system/SystemControlHub').then((m) => ({ default: m.SystemControlHub })),
-);
 const KioskManagementPage = lazy(() =>
   import('./components/system/KioskManagementPage').then((m) => ({
     default: m.KioskManagementPage,
@@ -679,10 +676,8 @@ const AppShell: React.FC = () => {
         }
       />
 
-      <Route
-        path="/system-control"
-        element={isMD || isTechAdmin ? <SystemControlHub /> : <Navigate to="/" replace />}
-      />
+      {/* System Control was folded into Super Admin (2026-09-15) — redirect any old bookmarks/links. */}
+      <Route path="/system-control" element={<Navigate to="/super-admin" replace />} />
       <Route
         path="/kiosk-management"
         element={isMD || isTechAdmin ? <KioskManagementPage /> : <Navigate to="/" replace />}
@@ -730,7 +725,6 @@ const AppShell: React.FC = () => {
     '/settings': 'Personal Settings',
     '/hr-hub': 'Employees & Attendance',
     '/analytics': 'Analytics & Goals',
-    '/system-control': 'System Control',
     '/kiosk-management': 'Kiosk Management',
     '/finance': 'Payments & Refunds',
     '/action-center': 'Action Center',
