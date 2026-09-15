@@ -4,4 +4,4 @@
 -- `prisma migrate deploy` picking up an unrelated pending migration from a
 -- concurrent session) but had no migration file tracking it -- added here so
 -- production has a real path to pick it up.
-ALTER TABLE `attendanceproposal` ADD COLUMN `leave_type` VARCHAR(191) NOT NULL DEFAULT 'FULL_DAY';
+ALTER TABLE `AttendanceProposal` ADD COLUMN `leave_type` VARCHAR(191) NOT NULL DEFAULT 'FULL_DAY';
