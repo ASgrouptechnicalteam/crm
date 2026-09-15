@@ -85,11 +85,28 @@ export const PUBLIC_PROPERTY_SELECT: Prisma.PropertySelect = {
 /** Renames the selected `final_price` column back to `price` for the public
  * JSON response — keeps the external API contract unchanged even though the
  * internal Property model no longer has its own separate `price` column. */
-export function shapePublicProperty<T extends { final_price: number }>(
+export function shapePublicProperty<T extends { final_price: number; pricing?: any }>(
   row: T,
 ): Omit<T, 'final_price'> & { price: number } {
-  const { final_price, ...rest } = row;
-  return { ...rest, price: final_price };
+  const { final_price, pricing, ...rest } = row;
+
+  const synthPricing = pricing || {
+    base_price: final_price,
+    final_price: final_price,
+    facing_premium: 0,
+    corner_premium: 0,
+    park_facing_premium: 0,
+    road_facing_premium: 0,
+    floor_rise_charge: 0,
+    development_charges: 0,
+    maintenance_charges: 0,
+    documentation_charges: 0,
+    registration_charges: 0,
+    other_charges: 0,
+    discount: 0,
+  };
+
+  return { ...rest, price: final_price, pricing: synthPricing } as any;
 }
 
 // WR-5/WR-6: Public-safe project allowlist
