@@ -16,7 +16,7 @@ import {
 import { WebsiteAccountService } from '../services/website/account.service';
 import { WebsiteSavedItemsService } from '../services/website/savedItems.service';
 import { WebsiteActivityService } from '../services/website/activity.service';
-import { PUBLIC_PROPERTY_SELECT } from './public';
+import { PUBLIC_PROPERTY_SELECT, shapePublicProperty } from './public';
 import { toSearchCandidate } from '../services/search/dto';
 import { rankProperties } from '../services/search/engine';
 import { determineEmptyState } from '../services/search/emptyState';
@@ -271,9 +271,26 @@ router.get('/:brand/search', optionalWebsiteAccount, async (req: any, res: Respo
       anyPropertiesExist,
     );
 
-    res
-      .status(200)
-      .json({ properties: results, total: results.length, recommendations, error, isGlobalEmpty });
+    // RESTORE THE FULL PAYLOADS: The AI search engine (rankProperties) and UI
+    // empty-state logic consume stripped MatchCandidates. The client UI expects
+    // full properties (images, pricing, etc). Map the MatchCandidates back to
+    // their source rows.
+    const rawMap = new Map(rawProperties.map((p) => [p.id, p]));
+    const recMap = new Map(recommendationPool.map((p) => [p.id, p]));
+
+    const finalProperties = results.map((r) => shapePublicProperty(rawMap.get(r.id)!));
+    const finalRecommendations = recommendations.map((group) => ({
+      ...group,
+      properties: group.properties.map((p) => shapePublicProperty(recMap.get(p.id)!)),
+    }));
+
+    res.status(200).json({
+      properties: finalProperties,
+      total: finalProperties.length,
+      recommendations: finalRecommendations,
+      error,
+      isGlobalEmpty,
+    });
   } catch (error) {
     logger.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });

@@ -2,6 +2,7 @@ import type { SearchQuery, PublicProperty } from '@/types/search';
 import type { RecommendationGroup } from '@/lib/recommendations/types';
 import { CRM_CONFIG } from '@/lib/constants';
 import { getOrCreateAnonId } from '@/lib/analytics/anonId';
+import { toPublicProperty } from '@/lib/dto';
 
 // Client-side replacement for lib/search.ts's executeSearch (which proxied
 // to the retiring Sonthillu-Backend BFF's own /api/search). Calls apps/api's
@@ -74,7 +75,7 @@ export async function executeSearch(
       throw new Error(`Search API failed with status: ${response.status}`);
     }
     const data = (await response.json()) as {
-      properties: PublicProperty[];
+      properties: any[];
       total: number;
       recommendations: RecommendationGroup[];
       error: string | null;
@@ -85,8 +86,24 @@ export async function executeSearch(
     const limit = query.limit && query.limit > 0 ? query.limit : 12;
     const start = (page - 1) * limit;
     const paged = data.properties.slice(start, start + limit);
+    const mappedProperties = paged.map(toPublicProperty);
 
-    return { ...data, properties: paged, total: data.properties.length };
+    const mappedRecommendations = data.recommendations.map((group) => ({
+      ...group,
+      items: group.items
+        ? group.items.map((item) => ({
+            ...item,
+            property: toPublicProperty(item.property as any),
+          }))
+        : [],
+    }));
+
+    return {
+      ...data,
+      properties: mappedProperties,
+      total: data.properties.length,
+      recommendations: mappedRecommendations,
+    };
   } catch (error) {
     console.error('Frontend executeSearch failed:', error);
     return {
