@@ -11,7 +11,7 @@
     "postinstall": "prisma generate --schema=apps/api/prisma/schema.prisma",
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
-    "prepare": "husky",
+    "prepare": "node -e \"if (process.env.CI || process.env.NODE_ENV === 'production') process.exit(0); require('child_process').execSync('husky', {stdio: 'inherit'})\"",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "prisma:seed": "ts-node apps/api/prisma/seed.ts",
