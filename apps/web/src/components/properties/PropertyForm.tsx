@@ -336,8 +336,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       if (!form.title.trim()) return 'Title is required';
     }
     if (STEPS[s] === 'Location' && !form.location.trim()) return 'Location is required';
-    if (STEPS[s] === 'Size & Details' && (!form.area_sqft || form.area_sqft <= 0))
-      return 'Area (sqft) is required';
+    if (STEPS[s] === 'Size & Details' && deriveOverallAreaSqft() <= 0)
+      return 'Please enter the primary area in the details section (e.g., Plot Area, Super Built-up Area, or Total Area).';
     if (STEPS[s] === 'Pricing' && (!form.base_rate || form.base_rate <= 0))
       return 'Base rate is required';
     return null;
@@ -365,6 +365,7 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     setSubmitting(true);
     try {
       const payload = buildPayload(form, details);
+      payload.area_sqft = deriveOverallAreaSqft();
       if (mode === 'create') {
         const { property: created } = await createProperty(fetchWithAuth, payload);
         if (stagedImages.length > 0) {
@@ -453,6 +454,41 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       default:
         return 0;
     }
+  };
+
+  const deriveOverallAreaSqft = (): number => {
+    const cat = form.category;
+    if (['APARTMENT', 'COMMERCIAL_OFFICE', 'COMMERCIAL_SHOP'].includes(cat)) {
+      return form.super_built_up_area_sqft || form.built_up_area_sqft || form.carpet_area_sqft || 0;
+    }
+    if (
+      [
+        'PLOT',
+        'VILLA',
+        'INDEPENDENT_HOUSE',
+        'FARM_HOUSE',
+        'INDEPENDENT_FLOOR',
+        'DUPLEX',
+        'STUDIO',
+      ].includes(cat)
+    ) {
+      return (form.plot_area_sqyd || 0) * 9;
+    }
+    if (['AGRICULTURAL_LAND'].includes(cat)) {
+      if (form.area_value && form.area_unit) {
+        const val = form.area_value;
+        const u = form.area_unit;
+        if (u === 'ACRE') return val * 43560;
+        if (u === 'GUNTA') return val * 1089;
+        if (u === 'CENT') return val * 435.6;
+        if (u === 'ANKANAM') return val * 72;
+        if (u === 'HECTARE') return val * 107639.1;
+        if (u === 'SQM') return val * 10.7639;
+        if (u === 'SQYD') return val * 9;
+        if (u === 'SQFT') return val;
+      }
+    }
+    return form.area_sqft || 0;
   };
 
   const PRICE_BASIS_AREA_FIELD_LABEL: Record<string, string> = {
@@ -1824,15 +1860,6 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
 
           {currentStep === 'Size & Details' && (
             <div className="space-y-4">
-              <div className="max-w-xs">
-                <FieldLabel required>Area (sqft, overall)</FieldLabel>
-                <input
-                  className={inputCls}
-                  type="number"
-                  value={form.area_sqft || ''}
-                  onChange={(e) => set('area_sqft', parseFloat(e.target.value) || 0)}
-                />
-              </div>
               {renderCategoryDetails()}
               <SectionCard title="Amenities">
                 <FieldLabel>Amenities (comma-separated)</FieldLabel>
