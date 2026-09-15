@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // Actions, no cookies(), no dynamic Route Handlers. `next build` now
   // writes a plain HTML/CSS/JS site to ./out.
   output: 'export',
-  trailingSlash: false,
+  trailingSlash: true,
   images: {
     unoptimized: true,
     remotePatterns: [

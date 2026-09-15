@@ -153,7 +153,7 @@ export function SearchFiltersPanel({
               placeholder="Min (e.g., 50L)"
               value={filters.minBudget}
               onChange={(e) => updateFilter('minBudget', e.target.value)}
-              className="flex-1 rounded-lg border border-border px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy/20"
+              className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy/20"
             />
             <span className="flex items-center text-text-muted">–</span>
             <input
@@ -161,7 +161,7 @@ export function SearchFiltersPanel({
               placeholder="Max (e.g., 1Cr)"
               value={filters.maxBudget}
               onChange={(e) => updateFilter('maxBudget', e.target.value)}
-              className="flex-1 rounded-lg border border-border px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy/20"
+              className="flex-1 min-w-0 rounded-lg border border-border px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand-navy focus:outline-none focus:ring-1 focus:ring-brand-navy/20"
             />
           </div>
           {/* Budget Presets */}
