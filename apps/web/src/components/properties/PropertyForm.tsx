@@ -437,9 +437,9 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
         return form.super_built_up_area_sqft || 0;
       case 'PLOT_AREA':
         if (form.plot_area_sqyd) return form.plot_area_sqyd * 9;
-        if (form.area_value && form.area_unit) {
+        if (form.area_value) {
           const val = form.area_value;
-          const u = form.area_unit;
+          const u = form.area_unit || 'ACRE';
           if (u === 'ACRE') return val * 43560;
           if (u === 'GUNTA') return val * 1089;
           if (u === 'CENT') return val * 435.6;
@@ -478,9 +478,9 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       return (form.plot_area_sqyd || 0) * 9;
     }
     if (['AGRICULTURAL_LAND'].includes(cat)) {
-      if (form.area_value && form.area_unit) {
+      if (form.area_value) {
         const val = form.area_value;
-        const u = form.area_unit;
+        const u = form.area_unit || 'ACRE';
         if (u === 'ACRE') return val * 43560;
         if (u === 'GUNTA') return val * 1089;
         if (u === 'CENT') return val * 435.6;
