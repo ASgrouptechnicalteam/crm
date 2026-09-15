@@ -1,11 +1,5 @@
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { GoogleGenAI, Type } from '@google/genai';
 import { z } from 'zod';
-
-// Ported from the BFFs' routes/search.ts POST /parse handler (the Sonthillu
-// fork's version, which additionally sets defaultHeaders and isolates the
-// OpenAI call's own error handling — picked over the Radha fork's plainer
-// version per the "more complete of the two" direction).
 
 const ParsedSearchQuerySchema = z.object({
   location: z
@@ -43,48 +37,64 @@ const ParsedSearchQuerySchema = z.object({
 });
 export type ParsedSearchQuery = z.infer<typeof ParsedSearchQuerySchema>;
 
-let client: OpenAI | null = null;
-function getClient(): OpenAI {
+let client: GoogleGenAI | null = null;
+function getClient(): GoogleGenAI {
   if (!client) {
-    client = new OpenAI({
-      baseURL: process.env.OPENAI_BASE_URL || undefined,
-      apiKey: process.env.OPENAI_API_KEY,
-      defaultHeaders: {
-        'HTTP-Referer': process.env.APP_URL || 'http://localhost:5173',
-        'X-Title': 'RRH CRM Public Search',
-      },
-    });
+    client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   return client;
 }
 
 export async function parseNaturalLanguageQuery(query: string): Promise<ParsedSearchQuery> {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     throw {
       status: 503,
-      message: 'AI search is currently disabled (OPENAI_API_KEY not configured).',
+      message: 'AI search is currently disabled (GEMINI_API_KEY not configured).',
     };
   }
 
-  let parsed: ParsedSearchQuery | undefined;
   try {
-    const completion = await getClient().chat.completions.parse({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content:
-            "You are an intelligent real estate search parser. Extract structured search criteria from the user's natural language query.",
+    const response = await getClient().models.generateContent({
+      model: 'gemini-3.5-flash-lite',
+      contents: query,
+      config: {
+        systemInstruction:
+          "You are an intelligent real estate search parser. Extract structured search criteria from the user's natural language query.",
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            location: { type: Type.STRING, nullable: true },
+            propertyType: {
+              type: Type.STRING,
+              enum: [
+                'APARTMENT',
+                'VILLA',
+                'INDEPENDENT_HOUSE',
+                'PLOT',
+                'COMMERCIAL',
+                'OFFICE',
+                'RETAIL',
+                'WAREHOUSE',
+              ],
+              nullable: true,
+            },
+            bedrooms: { type: Type.STRING, nullable: true },
+            minBudget: { type: Type.NUMBER, nullable: true },
+            maxBudget: { type: Type.NUMBER, nullable: true },
+            possessionStatus: {
+              type: Type.STRING,
+              enum: ['READY_TO_MOVE', 'UNDER_CONSTRUCTION'],
+              nullable: true,
+            },
+          },
         },
-        { role: 'user', content: query },
-      ],
-      response_format: zodResponseFormat(ParsedSearchQuerySchema, 'search_criteria'),
+      },
     });
-    parsed = completion.choices[0]?.message?.parsed ?? undefined;
+
+    if (!response.text) throw new Error('No text returned from Gemini');
+    return JSON.parse(response.text) as ParsedSearchQuery;
   } catch (apiError: any) {
     throw { status: 502, message: apiError?.message || 'AI search provider error' };
   }
-
-  if (!parsed) throw { status: 500, message: 'Failed to parse query' };
-  return parsed;
 }
