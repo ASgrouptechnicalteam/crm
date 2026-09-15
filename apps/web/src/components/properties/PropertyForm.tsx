@@ -11,6 +11,7 @@ import {
   Star,
   Camera,
   Upload,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -419,18 +420,47 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       (form.manual_lines || []).filter((_, idx) => idx !== i),
     );
 
+  // Mirrors the backend's resolveBasisAreaSqft exactly (shared/measurement.ts)
+  // — the server only ever reads the ONE area field matching the selected
+  // Price Basis, never falls back to whichever area field happens to be
+  // filled. The preview used to fall back across carpet/built-up/super-built-up,
+  // which could show a plausible non-zero total here while the server-side
+  // save silently priced at ₹0 (the basis-specific field was actually empty).
+  const areaSqftForBasis = (): number => {
+    switch (form.price_basis) {
+      case 'CARPET':
+        return form.carpet_area_sqft || 0;
+      case 'BUILT_UP':
+        return form.built_up_area_sqft || 0;
+      case 'SUPER_BUILT_UP':
+        return form.super_built_up_area_sqft || 0;
+      case 'PLOT_AREA':
+        return (form.plot_area_sqyd || 0) * 9;
+      case 'LUMPSUM':
+      default:
+        return 0;
+    }
+  };
+
+  const PRICE_BASIS_AREA_FIELD_LABEL: Record<string, string> = {
+    CARPET: 'Carpet Area',
+    BUILT_UP: 'Built-up Area',
+    SUPER_BUILT_UP: 'Super Built-up Area',
+    PLOT_AREA: 'Plot Area',
+  };
+  const PRICE_BASIS_LABELS: Record<string, string> = {
+    SUPER_BUILT_UP: 'Super Built-up',
+    BUILT_UP: 'Built-up',
+    CARPET: 'Carpet',
+    PLOT_AREA: 'Plot Area',
+    LUMPSUM: 'Lump Sum',
+  };
+
   // A read-only preview of the cost sheet this property would compute to,
   // purely for the admin's benefit — the authoritative computation always
   // happens server-side on submit.
   const previewComputation = () => {
-    const areaSqft =
-      group === 'LAND'
-        ? (form.plot_area_sqyd || 0) * 9
-        : form.super_built_up_area_sqft ||
-          form.built_up_area_sqft ||
-          form.carpet_area_sqft ||
-          form.area_sqft ||
-          0;
+    const areaSqft = areaSqftForBasis();
     const areaForRate = form.base_rate_unit === 'PER_SQYD' ? areaSqft / 9 : areaSqft;
     const base = form.base_rate ? form.base_rate * areaForRate : 0;
     const manual = (form.manual_lines || []).reduce((acc, l) => acc + (l.amount || 0), 0);
@@ -438,6 +468,8 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     return { base, manual, discount, total: base + manual - discount };
   };
   const preview = previewComputation();
+  const missingBasisArea =
+    form.price_basis !== 'LUMPSUM' && !!form.base_rate && areaSqftForBasis() <= 0;
 
   // ---- Small local field helpers for the category-specific step ----------
   const Text = ({ label, k }: { label: string; k: string }) => (
@@ -1860,33 +1892,53 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
                 </div>
               </div>
 
+              {missingBasisArea && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Price Basis is "
+                    {PRICE_BASIS_LABELS[form.price_basis as string] || form.price_basis}" but{' '}
+                    <strong>
+                      {PRICE_BASIS_AREA_FIELD_LABEL[form.price_basis as string] || 'that area'}
+                    </strong>{' '}
+                    isn't filled in on the Size & Details step — the base price will save as ₹0
+                    until it is, even though other area fields are filled.
+                  </span>
+                </div>
+              )}
+
               <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">
                 Additional Charges (Premiums / PLC / Development / Registration...)
               </p>
               <div className="space-y-2 mb-3">
                 {(form.manual_lines || []).map((line, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div
+                    key={i}
+                    className="flex flex-col sm:flex-row gap-2 sm:items-center p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  >
                     <input
-                      className={inputCls + ' flex-1'}
+                      className={inputCls + ' w-full sm:flex-1'}
                       placeholder="e.g. East Facing Premium, Corner Premium, Development Charges"
                       value={line.label}
                       onChange={(e) => updateManualLine(i, { label: e.target.value })}
                     />
-                    <input
-                      className={inputCls + ' w-32'}
-                      type="number"
-                      placeholder="Amount"
-                      value={line.amount || ''}
-                      onChange={(e) =>
-                        updateManualLine(i, { amount: parseFloat(e.target.value) || 0 })
-                      }
-                    />
-                    <button
-                      onClick={() => removeManualLine(i)}
-                      className="p-2 text-slate-400 hover:text-rose-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-2">
+                      <input
+                        className={inputCls + ' flex-1 sm:flex-none sm:w-32'}
+                        type="number"
+                        placeholder="Amount"
+                        value={line.amount || ''}
+                        onChange={(e) =>
+                          updateManualLine(i, { amount: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                      <button
+                        onClick={() => removeManualLine(i)}
+                        className="p-2 text-slate-400 hover:text-rose-600 shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <button
