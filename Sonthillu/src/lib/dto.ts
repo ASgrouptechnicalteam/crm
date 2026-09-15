@@ -24,8 +24,8 @@ export function toPublicProperty(property: any): PublicProperty {
     return property as PublicProperty; // pass it through
   }
 
-  const primaryImage = property.images?.find((img: any) => img.is_primary);
   const allImages = property.images || [];
+  const primaryImage = allImages.find((img: any) => img.is_primary) || allImages[0];
 
   return {
     id: property.id,

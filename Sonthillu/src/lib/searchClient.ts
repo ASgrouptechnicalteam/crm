@@ -88,15 +88,30 @@ export async function executeSearch(
     const paged = data.properties.slice(start, start + limit);
     const mappedProperties = paged.map(toPublicProperty);
 
-    const mappedRecommendations = data.recommendations.map((group) => ({
-      ...group,
-      items: group.items
-        ? group.items.map((item) => ({
+    const mappedRecommendations = data.recommendations.map((group: any, index: number) => {
+      const type = group.type || 'SIMILAR';
+      const itemsList = group.items || group.properties || [];
+      return {
+        ...group,
+        type,
+        title: group.title || 'Recommended Properties',
+        description: group.description || '',
+        items: itemsList.map((item: any, i: number) => {
+          // item could be a RecommendationItem or just a Property/MatchCandidate
+          const rawProperty = item.property ? item.property : item;
+          return {
             ...item,
-            property: toPublicProperty(item.property as any),
-          }))
-        : [],
-    }));
+            property: toPublicProperty(rawProperty),
+            type: item.type || type,
+            engineScore: item.engineScore || 1,
+            engineTier: item.engineTier || 'TIER_1',
+            rankWithinGroup: item.rankWithinGroup || i + 1,
+            reasons: item.reasons || [],
+            metadata: item.metadata || {},
+          };
+        }),
+      };
+    });
 
     return {
       ...data,
