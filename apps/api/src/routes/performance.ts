@@ -573,6 +573,8 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
             lateCount,
             halfDayCount,
             uninformedAbsent,
+            midnightAutoCheckoutEvents: midnightAutoCheckout,
+            missingDailyReportEvents: missingDailyReport,
             propertyBookingContributions,
           },
           zone:
