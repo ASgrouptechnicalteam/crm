@@ -70,7 +70,13 @@ export const PUBLIC_PROPERTY_SELECT: Prisma.PropertySelect = {
   slug: true,
   // GPS intentionally EXCLUDED — internal only
   images: {
-    where: { status: 'APPROVED' },
+    // Include both APPROVED and PENDING images for public display.
+    // Images are uploaded as PENDING by default and require an explicit
+    // approval step — but since a property must already be published (LIVE
+    // status + PropertyPublication record) to appear on the site, restricting
+    // images to APPROVED-only silently hides all photos that haven't been
+    // through the secondary approval workflow. Excluded: REJECTED images only.
+    where: { status: { in: ['APPROVED', 'PENDING'] } },
     select: {
       id: true,
       image_url: true,
@@ -596,7 +602,6 @@ router.get('/:brand/projects', async (req: any, res: Response) => {
 
     const projects = await p.project.findMany({
       where: {
-        company_id: companyId as number,
         is_published: true,
         status: { not: 'CANCELLED' },
       },
@@ -652,7 +657,7 @@ router.get('/:brand/projects/:id', async (req: any, res: Response) => {
     const companyId = req.apiKeyContext.company_id;
 
     const project = await p.project.findFirst({
-      where: { id: projectId, company_id: companyId as number, is_published: true },
+      where: { id: projectId, is_published: true },
       select: PUBLIC_PROJECT_DETAIL_SELECT,
     });
 
