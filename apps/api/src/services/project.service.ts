@@ -143,12 +143,19 @@ export class ProjectService {
     const companyId = user.companyId || 1;
     const branchId = user.branchId || null;
 
-    if (data.assigned_pm_id) {
+    let finalPmId = data.assigned_pm_id || null;
+
+    if (finalPmId) {
       const pm = await p.employee.findFirst({
-        where: { id: data.assigned_pm_id, company_id: companyId },
+        where: { id: finalPmId, company_id: companyId },
       });
       if (!pm)
         throw { status: 400, message: 'Invalid assigned_pm_id or does not belong to your company' };
+    } else {
+      // Auto-assign to the creator if they are a Project Manager
+      if (user.roles.includes(Roles.PROJECT_MANAGER)) {
+        finalPmId = user.employeeId;
+      }
     }
 
     const baseSlug = slugify(`${data.name} ${data.location}`);
@@ -178,7 +185,8 @@ export class ProjectService {
             project_phase: data.project_phase || null,
             rera_number: data.rera_number || null,
             amenities: data.amenities || null,
-            assigned_pm_id: data.assigned_pm_id || null,
+            assigned_pm_id: finalPmId,
+            created_by_id: user.employeeId,
             status: 'PLANNING',
             is_published: true, // Auto-publish: new projects appear on website immediately
             slug,

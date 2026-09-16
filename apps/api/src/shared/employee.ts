@@ -101,6 +101,7 @@ export const EmployeeCreateSchema = z.object({
       .nullable(),
   ),
   company_id: z.union([z.string(), z.number()]).optional().nullable(),
+  accessible_company_ids: z.array(z.union([z.string(), z.number()])).optional(),
 });
 
 export const EmployeeUpdateSchema = EmployeeSelfUpdateSchema.extend({
@@ -117,6 +118,7 @@ export const EmployeeUpdateSchema = EmployeeSelfUpdateSchema.extend({
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'RESIGNED']).optional().nullable(),
   attendance_required: z.boolean().optional().nullable(),
   role_name: z.string().optional().nullable(),
+  accessible_company_ids: z.array(z.union([z.string(), z.number()])).optional(),
 });
 
 export const EmployeeRolesUpdateSchema = z.object({

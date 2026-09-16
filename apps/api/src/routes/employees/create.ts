@@ -55,6 +55,8 @@ router.post(
         branch_id,
         additional_branch_ids,
         initial_password,
+        company_id,
+        accessible_company_ids,
       } = req.body;
 
       if (!role_name || !branch_id || !full_name || !phone) {
@@ -203,6 +205,15 @@ router.post(
           branches: {
             create: validAdditionalBranchIds.map((id) => ({ branch_id: id })),
           },
+          company_access: accessible_company_ids?.length
+            ? {
+                create: accessible_company_ids.map((id: string | number) => ({
+                  company_id: typeof id === 'string' ? parseInt(id, 10) : id,
+                })),
+              }
+            : {
+                create: [{ company_id: targetCompanyId }], // default to their own company if nothing specified
+              },
         },
         include: {
           branch: true,

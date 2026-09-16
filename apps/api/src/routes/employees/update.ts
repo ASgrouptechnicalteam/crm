@@ -169,6 +169,18 @@ router.patch(
           }
         }
 
+        if (body.accessible_company_ids !== undefined) {
+          await tx.employeeCompanyAccess.deleteMany({ where: { employee_id: employeeId } });
+          if (body.accessible_company_ids.length > 0) {
+            await tx.employeeCompanyAccess.createMany({
+              data: body.accessible_company_ids.map((id: string | number) => ({
+                employee_id: employeeId,
+                company_id: typeof id === 'string' ? parseInt(id, 10) : id,
+              })),
+            });
+          }
+        }
+
         if (shouldRevokeSessions) {
           updateData.token_version = { increment: 1 };
         }

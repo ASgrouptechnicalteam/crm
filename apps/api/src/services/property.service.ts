@@ -361,6 +361,9 @@ export class PropertyService {
     } else if (project && project.assigned_pm_id) {
       // Inherit from project
       finalPmId = project.assigned_pm_id;
+    } else if (user.roles.includes(Roles.PROJECT_MANAGER)) {
+      // Auto-assign to the creator if they are a Project Manager
+      finalPmId = user.employeeId;
     }
 
     if (!finalPmId && data.city) {

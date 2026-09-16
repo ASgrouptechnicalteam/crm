@@ -122,7 +122,11 @@ export async function buildPropertyScope(user: TokenPayload): Promise<Prisma.Pro
   if (user.roles.includes(Roles.PROJECT_MANAGER)) {
     return {
       ...propertyBaseScope,
-      OR: [{ assigned_pm_id: user.employeeId }, { status: 'LIVE' }],
+      OR: [
+        { assigned_pm_id: user.employeeId },
+        { created_by_id: user.employeeId },
+        { status: 'LIVE' },
+      ],
     };
   }
 
@@ -185,17 +189,24 @@ export async function buildProjectScope(user: TokenPayload): Promise<Prisma.Proj
     };
   }
 
-  // 4. MANAGEMENT — only see VERIFIED projects (no drafts for non-MD)
+  // 4. MANAGEMENT — only see VERIFIED projects (no drafts for non-MD), but always see their own created projects
   const isManagement = user.roles.some((r) => MANAGEMENT_ROLES.includes(r as any));
   if (isManagement) {
-    return { ...baseScope, verification_status: 'VERIFIED' };
+    return {
+      ...baseScope,
+      OR: [{ verification_status: 'VERIFIED' }, { created_by_id: user.employeeId }],
+    };
   }
 
-  // 5. PROJECT MANAGER - sees all their assigned projects (any verification_status) AND all other VERIFIED projects
+  // 5. PROJECT MANAGER - sees all their assigned projects, created projects, AND all other VERIFIED projects
   if (user.roles.includes(Roles.PROJECT_MANAGER)) {
     return {
       ...baseScope,
-      OR: [{ assigned_pm_id: user.employeeId }, { verification_status: 'VERIFIED' }],
+      OR: [
+        { assigned_pm_id: user.employeeId },
+        { created_by_id: user.employeeId },
+        { verification_status: 'VERIFIED' },
+      ],
     };
   }
 

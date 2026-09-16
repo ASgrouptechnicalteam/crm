@@ -344,6 +344,7 @@ model Employee {
   assigned_projects             Project[]                    @relation("AssignedPMProjects")
   verified_projects             Project[]                    @relation("ProjectVerifier")
   dm_executive_projects         Project[]                    @relation("DMExecutiveProjects")
+  created_projects              Project[]                    @relation("CreatedProjects")
   assigned_properties           Property[]                   @relation("AssignedPMProperties")
   dm_executive_properties       Property[]                   @relation("DMExecutiveProperties")
   created_properties            Property[]                   @relation("CreatedProperties")
@@ -988,6 +989,7 @@ model Project {
   verified_by_id       Int?
   verified_at          DateTime?
   verification_notes   String?   @db.Text
+  created_by_id        Int?
 
   // Set during the DM polish step -- mirrors Property's own fields exactly
   // (digital_marketing_executive_id/seo_title/seo_keywords on Property).
@@ -999,6 +1001,7 @@ model Project {
   branch                      Branch?   @relation(fields: [branch_id], references: [id])
   assigned_pm                 Employee? @relation("AssignedPMProjects", fields: [assigned_pm_id], references: [id])
   verified_by                 Employee? @relation("ProjectVerifier", fields: [verified_by_id], references: [id])
+  created_by                  Employee? @relation("CreatedProjects", fields: [created_by_id], references: [id])
   digital_marketing_executive Employee? @relation("DMExecutiveProjects", fields: [digital_marketing_executive_id], references: [id])
 
   properties    Property[]

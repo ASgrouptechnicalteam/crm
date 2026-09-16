@@ -98,6 +98,7 @@ router.get(
           include: {
             branch: true,
             roles: { include: { role: true } },
+            company_access: true,
           },
           orderBy: { created_at: 'desc' },
         }),
@@ -114,6 +115,7 @@ router.get(
         attendanceRequired: emp.attendance_required,
         firstLoginDone: emp.first_login_done,
         roles: emp.roles.map((r) => r.role.name),
+        accessibleCompanyIds: emp.company_access?.map((c: any) => c.company_id) || [],
         createdAt: emp.created_at,
 
         phone: emp.phone || '',
