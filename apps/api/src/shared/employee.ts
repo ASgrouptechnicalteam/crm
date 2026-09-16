@@ -42,9 +42,9 @@ export const EmployeeSelfUpdateSchema = z.object({
 });
 
 export const EmployeeCreateSchema = z.object({
-  full_name: z.string().min(1, 'Full name is required'),
-  phone: z.string().min(10, 'Phone is required'),
-  role_name: z.string().min(1, 'Role name is required'),
+  full_name: z.string().min(1, 'Please enter a valid full name'),
+  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  role_name: z.string().min(1, 'Please specify a role'),
   branch_id: z.union([z.string(), z.number()]),
   secondary_phone: z.string().optional().nullable(),
   whatsapp_number: z.string().optional().nullable(),
