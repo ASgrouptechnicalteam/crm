@@ -5,13 +5,7 @@ import { SiteVisitBooking, Lead, Employee } from '@prisma/client';
 export class SiteVisitPolicy {
   private static isManagement(user: TokenPayload): boolean {
     return user.roles.some((r) =>
-      [
-        Roles.MD,
-        Roles.ADMIN,
-        Roles.HR_MANAGER,
-        Roles.MARKETING_DIRECTOR,
-        Roles.PROJECT_MANAGER,
-      ].includes(r as any)
+      [Roles.MD, Roles.ADMIN, Roles.HR_MANAGER, Roles.MARKETING_DIRECTOR].includes(r as any),
     );
   }
 
@@ -30,12 +24,10 @@ export class SiteVisitPolicy {
 
   static canList(user: TokenPayload): any {
     const isManagement = this.isManagement(user);
-    
+
     // Unconditional tenant isolation via explicit AND
     const whereCondition: any = {
-      AND: [
-        { lead: { company_id: user.companyId } }
-      ]
+      AND: [{ lead: { company_id: user.companyId } }],
     };
 
     if (!isManagement) {
@@ -45,10 +37,10 @@ export class SiteVisitPolicy {
           { telecaller_id: user.employeeId },
           { assigned_agent_id: user.employeeId },
           { project_manager_id: user.employeeId },
-        ]
+        ],
       });
     }
-    
+
     return whereCondition;
   }
 
@@ -66,7 +58,11 @@ export class SiteVisitPolicy {
     return visit.lead.company_id === user.companyId;
   }
 
-  static canAssignAgent(user: TokenPayload, visit: { lead: { company_id: number } }, agent?: Employee): boolean {
+  static canAssignAgent(
+    user: TokenPayload,
+    visit: { lead: { company_id: number } },
+    agent?: Employee,
+  ): boolean {
     if (!(user.permissions || []).includes(Permissions.SITE_VISITS_ASSIGN_AGENT)) {
       return false;
     }
@@ -97,7 +93,10 @@ export class SiteVisitPolicy {
    * §2: only the PM/Agent the visit is currently routed to (PENDING_ACCEPTANCE)
    * may accept / reconfirm. For ACCEPTED visits, the assigned PM is the acceptor.
    */
-  static canAccept(user: TokenPayload, visit: { project_manager_id?: number | null; status: string }): boolean {
+  static canAccept(
+    user: TokenPayload,
+    visit: { project_manager_id?: number | null; status: string },
+  ): boolean {
     if (!(user.permissions || []).includes(Permissions.SITE_VISITS_ASSIGN_AGENT)) {
       return false;
     }
@@ -109,19 +108,21 @@ export class SiteVisitPolicy {
    * §2 reassignment chain: only PROJECT_MANAGER and AGENT roles may be
    * reassignment targets — never Telecaller, HR, or any other role.
    */
-  static canReassignTarget(user: TokenPayload, target: { roles?: string[]; role?: string; id: number }): boolean {
-    const targetRoles: string[] = target.roles
-      ? target.roles
-      : target.role
-      ? [target.role]
-      : [];
+  static canReassignTarget(
+    user: TokenPayload,
+    target: { roles?: string[]; role?: string; id: number },
+  ): boolean {
+    const targetRoles: string[] = target.roles ? target.roles : target.role ? [target.role] : [];
     return targetRoles.includes(Roles.PROJECT_MANAGER) || targetRoles.includes(Roles.AGENT);
   }
 
   /**
    * Phase D: Hold and Initiate Cancel are strictly restricted to the assigned telecaller.
    */
-  static canHoldOrInitiateCancel(user: TokenPayload, visit: { telecaller_id?: number | null }): boolean {
+  static canHoldOrInitiateCancel(
+    user: TokenPayload,
+    visit: { telecaller_id?: number | null },
+  ): boolean {
     if (!visit.telecaller_id) return false;
     return visit.telecaller_id === user.employeeId;
   }
@@ -129,7 +130,10 @@ export class SiteVisitPolicy {
   /**
    * Phase D: Confirm Cancel is restricted to the assigned project manager (or management override).
    */
-  static canConfirmCancel(user: TokenPayload, visit: { project_manager_id?: number | null }): boolean {
+  static canConfirmCancel(
+    user: TokenPayload,
+    visit: { project_manager_id?: number | null },
+  ): boolean {
     if (this.isManagement(user)) return true; // Optional management override if desired
     if (!visit.project_manager_id) return false;
     return visit.project_manager_id === user.employeeId;

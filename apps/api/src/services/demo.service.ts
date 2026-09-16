@@ -34,17 +34,21 @@ export async function listDemos(
   if (filters.status === 'PENDING') {
     whereCondition.accepted_at = null;
     whereCondition.lead.status = 'DEMO_SCHEDULED';
-    // For PENDING demos (not yet accepted/declined), restrict to the handler only
-    // to create a blind approval queue effect - other employees see only accepted demos.
-    // Bypass this restriction when a specific leadId is requested (e.g. LeadDetailModal DEMOS tab).
-    if (!filters.leadId) {
-      whereCondition.handler_id = user.employeeId;
-    }
   } else if (filters.status === 'ACCEPTED') {
     whereCondition.accepted_at = { not: null };
     whereCondition.lead.status = 'DEMO_SCHEDULED';
   } else if (filters.status === 'COMPLETED') {
     whereCondition.lead.status = 'DEMO_COMPLETED';
+  }
+
+  // Restrict visibility for non-management: PMs/Agents see their own handler assignments.
+  // Telecallers see demos for leads they own.
+  // We bypass this when fetching for a specific leadId (e.g. LeadDetailModal DEMOS tab).
+  if (!isMdOrAdmin(user) && !filters.leadId) {
+    whereCondition.OR = [
+      { handler_id: user.employeeId },
+      { lead: { assigned_to_id: user.employeeId } },
+    ];
   }
 
   if (filters.handler_id) {

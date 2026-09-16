@@ -363,6 +363,14 @@ export const RolePermissionsMatrix: Record<RoleName, string[]> = {
     Permissions.CUSTOMERS_CONVERT,
     Permissions.SITE_VISITS_CREATE,
     Permissions.SITE_VISITS_READ,
+    // Telecaller needs VERIFY to act on visits AFTER a PM accepts:
+    // reconfirm-customer, reschedule, confirm, hold, initiate-cancel all gate
+    // on this permission. Without it every post-acceptance button 403s.
+    // canVerify() in SiteVisitPolicy only checks company_id isolation — it
+    // does NOT restrict to any ownership subset — so this is safe to grant
+    // to all Telecallers. canList() already filters by telecaller_id, so
+    // they can only see (and act on) their own visits anyway.
+    Permissions.SITE_VISITS_VERIFY,
     // TelecallerDashboard.tsx fetches GET /demos unconditionally to populate
     // a per-lead "N Demo(s)" badge — without this it 403'd silently and the
     // badge never rendered even when a telecaller's own lead had one.
