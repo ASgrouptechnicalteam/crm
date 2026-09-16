@@ -126,7 +126,20 @@ export async function buildPropertyScope(user: TokenPayload): Promise<Prisma.Pro
     };
   }
 
-  // 3. TELECALLER, AGENT
+  // 3. AGENT
+  // Only see LIVE properties if they have a site visit for it (or its parent project)
+  if (user.roles.includes(Roles.AGENT)) {
+    return {
+      ...propertyBaseScope,
+      status: 'LIVE',
+      OR: [
+        { site_visits: { some: { assigned_agent_id: user.employeeId } } },
+        { project: { site_visits: { some: { assigned_agent_id: user.employeeId } } } },
+      ],
+    };
+  }
+
+  // 4. TELECALLER and everyone else
   // Default to LIVE properties only within their company.
   return {
     ...propertyBaseScope,
@@ -200,7 +213,20 @@ export async function buildProjectScope(user: TokenPayload): Promise<Prisma.Proj
     };
   }
 
-  // 7. Everyone else — only see VERIFIED projects
+  // 7. AGENT — only see VERIFIED projects that they have a site visit for
+  if (user.roles.includes(Roles.AGENT)) {
+    return {
+      ...baseScope,
+      verification_status: 'VERIFIED',
+      site_visits: {
+        some: {
+          assigned_agent_id: user.employeeId,
+        },
+      },
+    };
+  }
+
+  // 8. Everyone else (e.g. Telecallers) — only see VERIFIED projects
   return {
     ...baseScope,
     verification_status: 'VERIFIED',

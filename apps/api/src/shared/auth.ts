@@ -315,7 +315,9 @@ export const RolePermissionsMatrix: Record<RoleName, string[]> = {
 
   [Roles.DIGITAL_LEAD_OPERATOR]: [
     Permissions.PROJECTS_READ,
+    Permissions.PROJECTS_UPDATE,
     Permissions.PROPERTIES_READ,
+    Permissions.PROPERTIES_UPDATE,
     Permissions.LEADS_CREATE,
     Permissions.LEADS_READ,
     Permissions.LEADS_UPDATE,

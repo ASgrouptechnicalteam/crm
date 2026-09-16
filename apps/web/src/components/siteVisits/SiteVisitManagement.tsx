@@ -48,7 +48,7 @@ interface SiteVisit {
     | 'PENDING_VERIFICATION'
     | 'ASSIGNED_TO_AGENT'
     | 'RESCHEDULED';
-  verification_call_notes?: string;
+  verification_call_notes?: string | null;
   feedback_notes?: string;
   rating?: string;
   proof_photo_url?: string;
@@ -72,15 +72,38 @@ interface SiteVisit {
     plot_number?: string | null;
     project: { id: number; name: string };
   };
+  /** Multi-property links — the canonical source for what was visited */
   site_visit_properties?: { property_id: number | null; project_unit_id: number | null }[];
+  project?: { id: number; project_code: string; name: string };
 }
 
+// Bug 3 fix: stages now match the REAL §2 site visit workflow states.
+// Old keys (PENDING_VERIFICATION, ASSIGNED_TO_AGENT) no longer exist in the
+// state machine — every visit used to show "Stage 0" or blank because none
+// of its real statuses matched the legacy step keys.
 const VISIT_STAGES = [
-  { key: 'PENDING_VERIFICATION', label: '1. Verify' },
-  { key: 'CONFIRMED', label: '2. Confirmed' },
-  { key: 'ASSIGNED_TO_AGENT', label: '3. Agent Dispatched' },
-  { key: 'COMPLETED', label: '4. Completed' },
+  { key: 'PENDING_ACCEPTANCE', label: '1. PM Pending' },
+  { key: 'ACCEPTED', label: '2. Accepted' },
+  { key: 'PENDING_CUSTOMER_RECONFIRMATION', label: '3. Reconfirm' },
+  { key: 'CONFIRMED', label: '4. Confirmed' },
+  { key: 'ACTIVE', label: '5. Active' },
+  { key: 'COMPLETED', label: '6. Done' },
 ];
+
+// States that live between real stepper steps — they should keep the stepper
+// at the closest preceding completed step rather than showing "Stage 0".
+const STATUS_STEPPER_MAP: Record<string, string> = {
+  RESCHEDULE_REQUESTED: 'PENDING_CUSTOMER_RECONFIRMATION',
+  PENDING_PM_RECONFIRMATION: 'PENDING_CUSTOMER_RECONFIRMATION',
+  ON_HOLD: 'PENDING_CUSTOMER_RECONFIRMATION',
+  CANCELLATION_PENDING_PM_CONFIRMATION: 'PENDING_CUSTOMER_RECONFIRMATION',
+  REASSIGNED: 'PENDING_ACCEPTANCE',
+  ESCALATED_TO_MARKETING_DIRECTOR: 'PENDING_ACCEPTANCE',
+  // Legacy compat
+  PENDING_VERIFICATION: 'ACCEPTED',
+  ASSIGNED_TO_AGENT: 'CONFIRMED',
+  RESCHEDULED: 'CONFIRMED',
+};
 
 const SiteVisitStepper: React.FC<{ status: SiteVisit['status'] }> = ({ status }) => {
   if (status === 'CANCELLED') {
@@ -91,33 +114,34 @@ const SiteVisitStepper: React.FC<{ status: SiteVisit['status'] }> = ({ status })
       </div>
     );
   }
-  if (status === 'RESCHEDULED') {
-    return (
-      <div className="px-3 py-1 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 font-bold text-[11px] inline-flex items-center gap-1.5 my-1">
-        <Clock className="w-3.5 h-3.5" />
-        <span>Visit Rescheduled</span>
-      </div>
-    );
-  }
 
-  const currentIndex = VISIT_STAGES.findIndex((s) => s.key === status);
+  // Map intermediate/branching states to the nearest stepper step
+  const effectiveStatus = STATUS_STEPPER_MAP[status] ?? status;
+  const currentIndex = VISIT_STAGES.findIndex((s) => s.key === effectiveStatus);
 
   return (
     <div className="w-full my-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
       <div className="flex items-center justify-between text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">
-        <span>Field Dispatch Progress</span>
+        <span>Visit Progress</span>
         <span className="text-navy-800 font-bold">
-          {status === 'COMPLETED' ? 'Visit Complete' : `Stage ${currentIndex + 1} of 4`}
+          {status === 'COMPLETED'
+            ? 'Visit Complete'
+            : currentIndex >= 0
+              ? `Step ${currentIndex + 1} of ${VISIT_STAGES.length}`
+              : status.replace(/_/g, ' ')}
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-1">
+      <div
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${VISIT_STAGES.length}, minmax(0, 1fr))` }}
+      >
         {VISIT_STAGES.map((stg, idx) => {
-          const isCurrent = stg.key === status;
+          const isCurrent = stg.key === effectiveStatus;
           const isPassed = status === 'COMPLETED' || (currentIndex >= 0 && idx < currentIndex);
           return (
             <div
               key={stg.key}
-              className={`px-1 py-1 rounded-lg text-[9px] font-bold text-center leading-tight transition-all ${
+              className={`px-1 py-1 rounded-lg text-[8px] font-bold text-center leading-tight transition-all ${
                 isCurrent
                   ? 'bg-navy-600 text-white shadow-sm ring-1 ring-navy-400'
                   : isPassed
@@ -163,6 +187,9 @@ export const SiteVisitManagement: React.FC = () => {
     'INTERESTED',
   );
   const [propertyOutcomeReason, setPropertyOutcomeReason] = useState('');
+  // Confirm-cancel modal (P3)
+  const [showConfirmCancelModal, setShowConfirmCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -265,6 +292,128 @@ export const SiteVisitManagement: React.FC = () => {
       const data = await res.json();
       if (res.ok) {
         showToast(data.message, 'success');
+        fetchVisitsData();
+      } else {
+        await handleApiError(res, showError, data);
+      }
+    } catch (err) {
+      showError(
+        toUserFacingError({ message: err instanceof Error ? err.message : String(err), body: err }),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // P4: PUT ON HOLD — PENDING_CUSTOMER_RECONFIRMATION → ON_HOLD
+  const handleHoldVisit = async (visitId: number) => {
+    if (
+      !window.confirm(
+        'Put this visit on hold? The PM will be notified that you could not reach the customer.',
+      )
+    )
+      return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/site-visits/${visitId}/hold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Visit placed on hold. PM has been notified.', 'info');
+        fetchVisitsData();
+      } else {
+        await handleApiError(res, showError, data);
+      }
+    } catch (err) {
+      showError(
+        toUserFacingError({ message: err instanceof Error ? err.message : String(err), body: err }),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // P2: INITIATE CANCEL — ON_HOLD → CANCELLATION_PENDING_PM_CONFIRMATION (1-hr gate enforced server-side)
+  const handleInitiateCancel = async (visitId: number) => {
+    if (
+      !window.confirm(
+        'Send a cancellation cross-check request to the PM? This can only be done within 1 hour of the visit.',
+      )
+    )
+      return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/site-visits/${visitId}/initiate-cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Cancellation cross-check sent to PM.', 'info');
+        fetchVisitsData();
+      } else {
+        await handleApiError(res, showError, data);
+      }
+    } catch (err) {
+      showError(
+        toUserFacingError({ message: err instanceof Error ? err.message : String(err), body: err }),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // P3: REJECT CANCEL — PM says customer responded → revert to PENDING_CUSTOMER_RECONFIRMATION
+  const handleRejectCancel = async (visitId: number) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/site-visits/${visitId}/reject-cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(
+          'Visit reverted — customer confirmed as responsive. Reconfirmation is active again.',
+          'success',
+        );
+        fetchVisitsData();
+      } else {
+        await handleApiError(res, showError, data);
+      }
+    } catch (err) {
+      showError(
+        toUserFacingError({ message: err instanceof Error ? err.message : String(err), body: err }),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // P3: CONFIRM CANCEL — PM confirms no-show → CANCELLED
+  const handleConfirmCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVisit || !cancelReason.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithAuth(
+        `${API_BASE_URL}/site-visits/${selectedVisit.id}/confirm-cancel`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: cancelReason }),
+        },
+      );
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Visit cancelled.', 'success');
+        setShowConfirmCancelModal(false);
+        setCancelReason('');
         fetchVisitsData();
       } else {
         await handleApiError(res, showError, data);
@@ -413,16 +562,47 @@ export const SiteVisitManagement: React.FC = () => {
     }
   };
 
+  // Bug 4 fix: map EVERY real §2 workflow status to a colour — old code only
+  // handled legacy names so all live visits showed an identical grey badge.
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'PENDING_VERIFICATION':
+      // Pre-acceptance
+      case 'REQUESTED':
+        return 'bg-slate-100 text-slate-700 border-slate-300';
+      case 'PENDING_ACCEPTANCE':
         return 'bg-amber-100 text-amber-900 border-amber-300';
+      case 'REASSIGNED':
+        return 'bg-orange-100 text-orange-900 border-orange-300';
+      case 'ESCALATED_TO_MARKETING_DIRECTOR':
+        return 'bg-red-100 text-red-900 border-red-300';
+      // Active processing
+      case 'ACCEPTED':
+        return 'bg-blue-100 text-blue-900 border-blue-300';
+      case 'PENDING_CUSTOMER_RECONFIRMATION':
+        return 'bg-violet-100 text-violet-900 border-violet-300';
+      case 'RESCHEDULE_REQUESTED':
+        return 'bg-orange-100 text-orange-900 border-orange-300';
+      case 'PENDING_PM_RECONFIRMATION':
+        return 'bg-orange-100 text-orange-900 border-orange-300';
+      case 'ON_HOLD':
+        return 'bg-slate-200 text-slate-700 border-slate-400';
+      case 'CANCELLATION_PENDING_PM_CONFIRMATION':
+        return 'bg-rose-100 text-rose-900 border-rose-300';
+      // Confirmed & active
       case 'CONFIRMED':
         return 'bg-navy-100 text-navy-900 border-navy-300';
-      case 'ASSIGNED_TO_AGENT':
-        return 'bg-purple-100 text-purple-900 border-purple-300';
+      case 'ACTIVE':
+        return 'bg-emerald-200 text-emerald-900 border-emerald-400';
+      // Terminal
       case 'COMPLETED':
         return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+      case 'CANCELLED':
+        return 'bg-rose-100 text-rose-800 border-rose-300';
+      // Legacy compat
+      case 'PENDING_VERIFICATION':
+        return 'bg-amber-100 text-amber-900 border-amber-300';
+      case 'ASSIGNED_TO_AGENT':
+        return 'bg-purple-100 text-purple-900 border-purple-300';
       default:
         return 'bg-slate-100 text-slate-800 border-slate-300';
     }
@@ -544,7 +724,8 @@ export const SiteVisitManagement: React.FC = () => {
               </div>
 
               {/* Action Buttons based on Workflow Stage */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+                {/* ─── ACCEPTED: Telecaller reconfirms with customer ─── */}
                 {visit.status === 'ACCEPTED' && canVerify && (
                   <button
                     onClick={() => handleReconfirmCustomer(visit.id)}
@@ -556,6 +737,50 @@ export const SiteVisitManagement: React.FC = () => {
                   </button>
                 )}
 
+                {/* Bug 10 / Bug 7 fix: "Send PM Accepted WA" fires at ACCEPTED (not CONFIRMED).
+                    Telecaller needs PM name + phone NOW so they can relay it to the customer. */}
+                {visit.status === 'ACCEPTED' && visit.project_manager && (
+                  <button
+                    onClick={() =>
+                      sendWhatsAppMessage('SITE_VISIT_ACCEPTED', visit.lead.phone, {
+                        customer_name: visit.lead.customer_name,
+                        visit_date: new Date(visit.scheduled_date).toLocaleDateString('en-IN'),
+                        visit_time: new Date(visit.scheduled_date).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                        pm_name: visit.project_manager?.full_name ?? 'Your Project Manager',
+                        // pm_phone passed so the WA template can include it
+                        agent_name: visit.project_manager?.phone ?? '',
+                        property_name:
+                          visit.property?.title ||
+                          visit.project_unit?.project?.name ||
+                          'the property',
+                      })
+                    }
+                    className="w-full py-2 bg-[#25D366] hover:bg-[#1DA851] text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send PM Accepted WA to Customer</span>
+                  </button>
+                )}
+
+                {/* ─── ACCEPTED: Reschedule allowed early (Bug 5 fix) ─── */}
+                {visit.status === 'ACCEPTED' && canVerify && (
+                  <button
+                    onClick={() => {
+                      setSelectedVisit(visit);
+                      setRescheduleSuccess(false);
+                      setShowRescheduleModal(true);
+                    }}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Reschedule Visit</span>
+                  </button>
+                )}
+
+                {/* ─── PENDING_CUSTOMER_RECONFIRMATION ─── */}
                 {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && canVerify && (
                   <button
                     onClick={() => handleConfirmVisit(visit.id)}
@@ -563,10 +788,205 @@ export const SiteVisitManagement: React.FC = () => {
                     className="w-full py-2 bg-navy-700 hover:bg-navy-800 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Confirm Visit</span>
+                    <span>Confirm Visit (Customer OK)</span>
                   </button>
                 )}
 
+                {/* Bug 6 fix: Day-before WA appears here so telecaller can send it after reconfirmation call */}
+                {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && (
+                  <button
+                    onClick={() =>
+                      sendWhatsAppMessage('DAY_BEFORE_RECONFIRMATION', visit.lead.phone, {
+                        customer_name: visit.lead.customer_name,
+                        visit_date: new Date(visit.scheduled_date).toLocaleDateString('en-IN'),
+                        visit_time: new Date(visit.scheduled_date).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                        pm_name: visit.project_manager?.full_name || 'Your Project Manager',
+                        agent_name: visit.project_manager?.phone || '',
+                      })
+                    }
+                    className="w-full py-2 bg-white border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Send Day-Before WA Reminder</span>
+                  </button>
+                )}
+
+                {/* Reschedule from PENDING_CUSTOMER_RECONFIRMATION (Bug 5 fix) */}
+                {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && canVerify && (
+                  <button
+                    onClick={() => {
+                      setSelectedVisit(visit);
+                      setRescheduleSuccess(false);
+                      setShowRescheduleModal(true);
+                    }}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Reschedule Instead</span>
+                  </button>
+                )}
+
+                {/* P4: Put On Hold — customer completely unreachable */}
+                {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && canVerify && (
+                  <button
+                    onClick={() => handleHoldVisit(visit.id)}
+                    disabled={isSubmitting}
+                    className="w-full py-2 bg-slate-500 hover:bg-slate-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Put On Hold (Customer Unreachable)</span>
+                  </button>
+                )}
+
+                {/* P2: ON_HOLD — telecaller can reschedule or initiate cancellation cross-check */}
+                {visit.status === 'ON_HOLD' && canVerify && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <p className="text-[11px] font-bold text-slate-600">
+                      Visit is on hold — customer was unreachable. What would you like to do?
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSelectedVisit(visit);
+                        setRescheduleSuccess(false);
+                        setShowRescheduleModal(true);
+                      }}
+                      className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      Reschedule Visit
+                    </button>
+                    <button
+                      onClick={() => handleInitiateCancel(visit.id)}
+                      disabled={isSubmitting}
+                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Initiate Cancellation (1-hr gate applies)
+                    </button>
+                  </div>
+                )}
+
+                {/* P3: CANCELLATION_PENDING_PM_CONFIRMATION — PM decides to keep or cancel */}
+                {visit.status === 'CANCELLATION_PENDING_PM_CONFIRMATION' && isPMOrMD && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
+                    <p className="text-[11px] font-bold text-rose-800">
+                      Telecaller could not reach the customer (1 hr before visit). Did the customer
+                      contact you?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRejectCancel(visit.id)}
+                        disabled={isSubmitting}
+                        className="flex-1 py-2 bg-navy-700 hover:bg-navy-800 text-white font-bold text-xs rounded-xl shadow disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Yes — Keep Visit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedVisit(visit);
+                          setCancelReason('');
+                          setShowConfirmCancelModal(true);
+                        }}
+                        disabled={isSubmitting}
+                        className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        No — Cancel Visit
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── PENDING_PM_RECONFIRMATION: PM confirms or releases (Bug 8 fix) ─── */}
+                {visit.status === 'PENDING_PM_RECONFIRMATION' && isPMOrMD && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
+                    <p className="text-[11px] font-bold text-orange-800">
+                      Customer requested a reschedule — do you confirm the new date?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setIsSubmitting(true);
+                          try {
+                            const res = await fetchWithAuth(
+                              `${API_BASE_URL}/site-visits/${visit.id}/pm-reconfirm`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ release: false }),
+                              },
+                            );
+                            const d = await res.json();
+                            if (res.ok) {
+                              showToast('Reschedule confirmed — visit is now ACCEPTED.', 'success');
+                              fetchVisitsData();
+                            } else {
+                              await handleApiError(res, showError, d);
+                            }
+                          } catch (err) {
+                            showError(
+                              toUserFacingError({
+                                message: err instanceof Error ? err.message : String(err),
+                                body: err,
+                              }),
+                            );
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        className="flex-1 py-2 bg-navy-700 hover:bg-navy-800 text-white font-bold text-xs rounded-xl shadow disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Confirm Reschedule
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setIsSubmitting(true);
+                          try {
+                            const res = await fetchWithAuth(
+                              `${API_BASE_URL}/site-visits/${visit.id}/pm-reconfirm`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ release: true }),
+                              },
+                            );
+                            const d = await res.json();
+                            if (res.ok) {
+                              showToast(
+                                'Released — visit reset to PENDING_ACCEPTANCE for the project PM.',
+                                'info',
+                              );
+                              fetchVisitsData();
+                            } else {
+                              await handleApiError(res, showError, d);
+                            }
+                          } catch (err) {
+                            showError(
+                              toUserFacingError({
+                                message: err instanceof Error ? err.message : String(err),
+                                body: err,
+                              }),
+                            );
+                          } finally {
+                            setIsSubmitting(false);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        className="flex-1 py-2 bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 font-bold text-xs rounded-xl shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        Release Back
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── CONFIRMED ─── */}
                 {visit.status === 'CONFIRMED' && isPMOrMD && (
                   <button
                     onClick={() => {
@@ -580,7 +1000,6 @@ export const SiteVisitManagement: React.FC = () => {
                   </button>
                 )}
 
-                {/* Reschedule Button — POST /reschedule also requires site_visits.verify */}
                 {visit.status === 'CONFIRMED' && canVerify && (
                   <button
                     onClick={() => {
@@ -596,8 +1015,7 @@ export const SiteVisitManagement: React.FC = () => {
                 )}
 
                 {/* COMPLETE is only valid from ACTIVE (siteVisit.workflow.ts),
-                    never directly from CONFIRMED — START is the missing step
-                    between them. Both share site_visits.complete. */}
+                    never directly from CONFIRMED — START is the missing step. */}
                 {visit.status === 'CONFIRMED' && canComplete && (
                   <button
                     onClick={() => handleStartVisit(visit.id)}
@@ -609,6 +1027,29 @@ export const SiteVisitManagement: React.FC = () => {
                   </button>
                 )}
 
+                {/* Day-before WA for CONFIRMED status as well */}
+                {visit.status === 'CONFIRMED' && (
+                  <button
+                    onClick={() =>
+                      sendWhatsAppMessage('DAY_BEFORE_RECONFIRMATION', visit.lead.phone, {
+                        customer_name: visit.lead.customer_name,
+                        visit_date: new Date(visit.scheduled_date).toLocaleDateString('en-IN'),
+                        visit_time: new Date(visit.scheduled_date).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                        pm_name: visit.project_manager?.full_name || 'Your Project Manager',
+                        agent_name: visit.project_manager?.phone || '',
+                      })
+                    }
+                    className="w-full py-2 bg-white border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Day-Before WA</span>
+                  </button>
+                )}
+
+                {/* ─── ACTIVE ─── */}
                 {visit.status === 'ACTIVE' && canComplete && (
                   <button
                     onClick={() => {
@@ -622,68 +1063,27 @@ export const SiteVisitManagement: React.FC = () => {
                   </button>
                 )}
 
-                {/* WhatsApp Action Buttons */}
-                <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-                  {visit.status === 'CONFIRMED' && (
-                    <button
-                      onClick={() =>
-                        sendWhatsAppMessage('SITE_VISIT_ACCEPTED', visit.lead.phone, {
-                          customer_name: visit.lead.customer_name,
-                          visit_date: new Date(visit.scheduled_date).toLocaleDateString(),
-                          visit_time: new Date(visit.scheduled_date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }),
-                        })
-                      }
-                      className="w-full py-2 bg-[#25D366] hover:bg-[#1DA851] text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>Send Accepted WA</span>
-                    </button>
-                  )}
-
-                  {visit.status === 'CONFIRMED' && (
-                    <button
-                      onClick={() =>
-                        sendWhatsAppMessage('DAY_BEFORE_RECONFIRMATION', visit.lead.phone, {
-                          customer_name: visit.lead.customer_name,
-                          visit_date: new Date(visit.scheduled_date).toLocaleDateString(),
-                          visit_time: new Date(visit.scheduled_date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }),
-                          pm_name: visit.project_manager?.full_name || 'Your Project Manager',
-                        })
-                      }
-                      className="w-full py-2 bg-white border border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>Day-Before WA</span>
-                    </button>
-                  )}
-
-                  {visit.status === 'COMPLETED' && (
-                    <button
-                      onClick={() =>
-                        sendWhatsAppMessage('POST_VISIT_INTERESTED', visit.lead.phone, {
-                          customer_name: visit.lead.customer_name,
-                          visit_date: new Date(visit.scheduled_date).toLocaleDateString(),
-                          visit_time: new Date(visit.scheduled_date).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }),
-                          pm_name: visit.project_manager?.full_name || 'Your Project Manager',
-                          property_name: visit.property?.title || 'the property',
-                        })
-                      }
-                      className="w-full py-2 bg-[#25D366] hover:bg-[#1DA851] text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>Post-Visit Follow-Up WA</span>
-                    </button>
-                  )}
-                </div>
+                {/* ─── COMPLETED ─── */}
+                {visit.status === 'COMPLETED' && (
+                  <button
+                    onClick={() =>
+                      sendWhatsAppMessage('POST_VISIT_INTERESTED', visit.lead.phone, {
+                        customer_name: visit.lead.customer_name,
+                        visit_date: new Date(visit.scheduled_date).toLocaleDateString('en-IN'),
+                        visit_time: new Date(visit.scheduled_date).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                        pm_name: visit.project_manager?.full_name || 'Your Project Manager',
+                        property_name: visit.property?.title || 'the property',
+                      })
+                    }
+                    className="w-full py-2 bg-[#25D366] hover:bg-[#1DA851] text-white font-bold text-[10px] uppercase tracking-wide rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3 h-3" />
+                    <span>Post-Visit Follow-Up WA</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -977,6 +1377,63 @@ export const SiteVisitManagement: React.FC = () => {
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Confirm Cancel (PM provides cancellation reason) — P3 */}
+      {showConfirmCancelModal && selectedVisit && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-rose-100 bg-rose-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-rose-900">Confirm Visit Cancellation</h3>
+                <p className="text-xs text-rose-600 mt-0.5">
+                  This permanently cancels {selectedVisit.booking_code}. A reason is required.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConfirmCancelModal(false)}
+                className="p-2 text-rose-400 hover:text-rose-600 rounded-full hover:bg-rose-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleConfirmCancel} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                  Cancellation Reason
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. No-Show — customer did not attend and cannot be reached after multiple attempts."
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  If the reason contains "no show", the system will track it. 2+ no-shows triggers a
+                  manager alert.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmCancelModal(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !cancelReason.trim()}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl disabled:opacity-50 shadow-sm"
+                >
+                  {isSubmitting ? 'Cancelling...' : 'Confirm Cancel'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
