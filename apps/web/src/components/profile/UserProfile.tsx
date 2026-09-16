@@ -16,8 +16,7 @@ import {
   FileText,
   CreditCard,
 } from 'lucide-react';
-import { PerformanceScoreWidget } from '../performance/PerformanceScoreWidget';
-import { PerformanceHistoryTimeline } from '../performance/PerformanceHistoryTimeline';
+
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { ProfileEditModal } from './ProfileEditModal';
 import { QRCodeVisual } from '../common/QRCodeVisual';
@@ -292,51 +291,43 @@ export const UserProfile: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <h2 className="text-lg font-bold text-slate-800 px-1">My Performance Metrics</h2>
-          <PerformanceScoreWidget />
-          <PerformanceHistoryTimeline />
+      {/* QR Code Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-lg font-bold text-slate-800">Attendance QR</h2>
+          {qrToken && (
+            <button
+              onClick={() => setIsQRFullscreen(true)}
+              className="flex items-center gap-1.5 text-xs font-bold text-navy-600 hover:text-navy-800 transition-colors"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>Full screen</span>
+            </button>
+          )}
         </div>
-
-        {/* QR Code Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-bold text-slate-800">Attendance QR</h2>
-            {qrToken && (
-              <button
-                onClick={() => setIsQRFullscreen(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-navy-600 hover:text-navy-800 transition-colors"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-                <span>Full screen</span>
-              </button>
-            )}
-          </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[300px]">
-            {qrToken ? (
-              <>
-                <QRCodeVisual value={qrToken} size={180} label={user.employeeCode} />
-                <p className="text-xs text-slate-500 mt-4 text-center">
-                  Scan this code at the Kiosk terminal to mark your daily attendance.
-                </p>
-                <div className="mt-4 pt-4 border-t border-slate-100 w-full text-center">
-                  <button
-                    onClick={() => setIsEmergencyModalOpen(true)}
-                    className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center justify-center gap-1.5 mx-auto transition-colors px-3 py-2 rounded-lg hover:bg-rose-50"
-                  >
-                    <AlertTriangle className="w-4 h-4" />
-                    Emergency Early Logout
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-center text-slate-400">
-                <QrCode className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">QR Code not available</p>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[300px]">
+          {qrToken ? (
+            <>
+              <QRCodeVisual value={qrToken} size={180} label={user.employeeCode} />
+              <p className="text-xs text-slate-500 mt-4 text-center">
+                Scan this code at the Kiosk terminal to mark your daily attendance.
+              </p>
+              <div className="mt-4 pt-4 border-t border-slate-100 w-full text-center">
+                <button
+                  onClick={() => setIsEmergencyModalOpen(true)}
+                  className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center justify-center gap-1.5 mx-auto transition-colors px-3 py-2 rounded-lg hover:bg-rose-50"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  Emergency Early Logout
+                </button>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <div className="text-center text-slate-400">
+              <QrCode className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">QR Code not available</p>
+            </div>
+          )}
         </div>
       </div>
 
