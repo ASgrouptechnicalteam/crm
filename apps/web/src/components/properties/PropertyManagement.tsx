@@ -350,7 +350,7 @@ export const PropertyManagement: React.FC = () => {
   const [dmExecutiveId, setDmExecutiveId] = useState('');
   const [dmExecutives, setDmExecutives] = useState<PmListItem[]>([]);
 
-  const isPM = ([Roles.PROJECT_MANAGER, Roles.MD, Roles.ADMIN] as string[]).includes(activeRole);
+  const isPM = activeRole === Roles.PROJECT_MANAGER;
   const isDM = (
     [
       Roles.DIGITAL_LEAD_OPERATOR,
@@ -924,8 +924,27 @@ export const PropertyManagement: React.FC = () => {
 
               {/* Stage 1 — Guided PM Verification Wizard */}
               {selectedProperty.status === 'PENDING_VERIFICATION' &&
-                user?.permissions?.includes(Permissions.PROPERTIES_VERIFY) &&
                 (() => {
+                  const isMDOrAdmin = ([Roles.MD, Roles.ADMIN] as string[]).includes(activeRole);
+                  const isAssignedPM = isPM && selectedProperty.assigned_pm?.id === user?.id;
+                  const isUnassigned = !selectedProperty.assigned_pm;
+                  const canVerify = isAssignedPM || (isMDOrAdmin && isUnassigned);
+
+                  if (!canVerify) {
+                    return (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                        <p className="text-xs text-amber-800 font-bold mb-1">
+                          Awaiting PM Verification
+                        </p>
+                        <p className="text-[11px] text-amber-700">
+                          {selectedProperty.assigned_pm
+                            ? `Currently being verified by PM: ${selectedProperty.assigned_pm.full_name}`
+                            : 'Unassigned — MD must assign a PM.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
                   const locConfirmed = !!selectedProperty.location_confirmed_by_pm;
                   const pmUploadedImages =
                     selectedProperty.images?.filter((img) => img.uploaded_by_id === user?.id) ?? [];
@@ -1202,32 +1221,58 @@ export const PropertyManagement: React.FC = () => {
 
               {/* REJECTED — this used to be a dead end with no way forward */}
               {selectedProperty.status === 'REJECTED' &&
-                user?.permissions?.includes(Permissions.PROPERTIES_VERIFY) && (
-                  <div className="space-y-2">
-                    {selectedProperty.rejection_reason && (
-                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-                        <span className="font-bold">Rejection reason: </span>
-                        {selectedProperty.rejection_reason}
+                (() => {
+                  const isCreator = selectedProperty.created_by?.id === user?.id;
+                  const isMDOrAdmin = ([Roles.MD, Roles.ADMIN] as string[]).includes(activeRole);
+                  const isUnassigned = !selectedProperty.assigned_pm;
+                  const canResubmit = isCreator || (isMDOrAdmin && isUnassigned);
+
+                  if (!canResubmit) {
+                    return (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                        <p className="text-xs text-rose-800 font-bold mb-1">Property Rejected</p>
+                        <p className="text-[11px] text-rose-700">
+                          This property was rejected and needs to be fixed and resubmitted by the
+                          person who created it (
+                          {selectedProperty.created_by?.full_name || 'System'}).
+                        </p>
+                        {selectedProperty.rejection_reason && (
+                          <div className="mt-2 p-2 bg-white/50 border border-rose-100 rounded text-xs text-rose-800">
+                            <span className="font-bold">Rejection reason: </span>
+                            {selectedProperty.rejection_reason}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <p className="text-xs text-slate-600">
-                      Fix the issue above, then resubmit this property for verification.
-                    </p>
-                    <textarea
-                      rows={2}
-                      placeholder="Notes for MD/PM about what was fixed (optional)..."
-                      value={actionNotes}
-                      onChange={(e) => setActionNotes(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl"
-                    />
-                    <button
-                      onClick={() => handleResubmit(selectedProperty.id)}
-                      className="px-4 py-2 bg-navy-700 hover:bg-navy-800 text-white font-bold text-xs rounded-xl shadow"
-                    >
-                      Resubmit for Verification
-                    </button>
-                  </div>
-                )}
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {selectedProperty.rejection_reason && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                          <span className="font-bold">Rejection reason: </span>
+                          {selectedProperty.rejection_reason}
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-600">
+                        Fix the issue above, then resubmit this property for verification.
+                      </p>
+                      <textarea
+                        rows={2}
+                        placeholder="Notes for MD/PM about what was fixed (optional)..."
+                        value={actionNotes}
+                        onChange={(e) => setActionNotes(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl"
+                      />
+                      <button
+                        onClick={() => handleResubmit(selectedProperty.id)}
+                        className="px-4 py-2 bg-navy-700 hover:bg-navy-800 text-white font-bold text-xs rounded-xl shadow"
+                      >
+                        Resubmit for Verification
+                      </button>
+                    </div>
+                  );
+                })()}
 
               {/* Stage 3 Action for MD */}
               {selectedProperty.status === 'PENDING_MD_APPROVAL' &&

@@ -82,6 +82,7 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
   const [addRole, setAddRole] = useState('telecallers');
   const [addBranchId, setAddBranchId] = useState<string>('');
   const [additionalBranchIds, setAdditionalBranchIds] = useState<string[]>([]);
+  const [accessibleCompanyIds, setAccessibleCompanyIds] = useState<string[]>([]);
   const [initialPassword, setInitialPassword] = useState(generateSuggestedPassword);
 
   // Step 2: Personal Details
@@ -132,6 +133,7 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
         role_name: addRole,
         branch_id: addBranchId,
         additional_branch_ids: additionalBranchIds,
+        accessible_company_ids: accessibleCompanyIds,
         initial_password: initialPassword,
 
         current_address: currentAddress,
@@ -337,6 +339,28 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
                   Hold Ctrl (Windows) or Cmd (Mac) to select multiple.
+                </p>
+              </div>
+
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Accessible Companies
+                </label>
+                <select
+                  multiple
+                  value={accessibleCompanyIds}
+                  onChange={(e) => {
+                    const options = Array.from(e.target.selectedOptions, (option) => option.value);
+                    setAccessibleCompanyIds(options);
+                  }}
+                  className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500 min-h-[80px]"
+                >
+                  <option value="1">Radha Real Homes</option>
+                  <option value="2">Sonthillu Constructions</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Which companies' projects and properties this employee can see/manage. Hold Ctrl
+                  (Windows) or Cmd (Mac) to select multiple.
                 </p>
               </div>
 

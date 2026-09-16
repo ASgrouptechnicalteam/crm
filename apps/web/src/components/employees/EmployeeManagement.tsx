@@ -58,6 +58,7 @@ interface Employee {
   attendanceRequired: boolean;
   firstLoginDone: boolean;
   roles: string[];
+  accessibleCompanyIds?: number[];
   createdAt: string;
 
   // Industrial Details

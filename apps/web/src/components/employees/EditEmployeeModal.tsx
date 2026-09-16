@@ -35,6 +35,7 @@ interface Employee {
   attendanceRequired: boolean;
   firstLoginDone: boolean;
   roles: string[];
+  accessibleCompanyIds?: number[];
   createdAt: string;
 
   phone: string;
@@ -93,6 +94,9 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const [email, setEmail] = useState(employee.email || '');
   const [roleName, setRoleName] = useState(employee.roles[0] || 'Telecaller');
   const [branchId, setBranchId] = useState<string>(String(employee.branchId || ''));
+  const [accessibleCompanyIds, setAccessibleCompanyIds] = useState<string[]>(
+    employee.accessibleCompanyIds?.map(String) || [],
+  );
 
   // Personal Info
   const [currentAddress, setCurrentAddress] = useState(employee.currentAddress || '');
@@ -154,6 +158,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         email: email || undefined,
         role_name: roleName || undefined,
         branch_id: branchId || undefined,
+        accessible_company_ids: accessibleCompanyIds.length > 0 ? accessibleCompanyIds : undefined,
 
         current_address: currentAddress || undefined,
         permanent_address: permanentAddress || undefined,
@@ -338,6 +343,34 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-2">
+                    Accessible Companies
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      (Leave empty to keep current access intact)
+                    </span>
+                  </label>
+                  <select
+                    multiple
+                    value={accessibleCompanyIds}
+                    onChange={(e) => {
+                      const options = Array.from(
+                        e.target.selectedOptions,
+                        (option) => option.value,
+                      );
+                      setAccessibleCompanyIds(options);
+                    }}
+                    className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500 min-h-[80px]"
+                  >
+                    <option value="1">Radha Real Homes</option>
+                    <option value="2">Sonthillu Constructions</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Hold Ctrl (Windows) or Cmd (Mac) to select multiple. Overwrites existing access
+                    if changed.
+                  </p>
                 </div>
               </div>
             )}
