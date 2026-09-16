@@ -873,7 +873,7 @@ export const SiteVisitManagement: React.FC = () => {
                 {/* P3: CANCELLATION_PENDING_PM_CONFIRMATION — PM decides to keep or cancel */}
                 {visit.status === 'CANCELLATION_PENDING_PM_CONFIRMATION' && (
                   <>
-                    {isPM && visit.project_manager?.id === user?.employeeId && (
+                    {isPM && visit.project_manager?.id === user?.id && (
                       <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2">
                         <p className="text-[11px] font-bold text-rose-800">
                           Telecaller could not reach the customer (1 hr before visit). Did the
@@ -903,23 +903,22 @@ export const SiteVisitManagement: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    {isMD &&
-                      (!visit.project_manager || visit.project_manager.id !== user?.employeeId) && (
-                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
-                          <p className="text-[11px] font-bold text-rose-800 flex items-center gap-2">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Pending Cancellation Confirmation from PM:{' '}
-                            {visit.project_manager?.full_name || 'Unassigned'}
-                          </p>
-                        </div>
-                      )}
+                    {isMD && (!visit.project_manager || visit.project_manager.id !== user?.id) && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                        <p className="text-[11px] font-bold text-rose-800 flex items-center gap-2">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Pending Cancellation Confirmation from PM:{' '}
+                          {visit.project_manager?.full_name || 'Unassigned'}
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
 
                 {/* ─── PENDING_PM_RECONFIRMATION: PM confirms or releases (Bug 8 fix) ─── */}
                 {visit.status === 'PENDING_PM_RECONFIRMATION' && (
                   <>
-                    {isPM && visit.project_manager?.id === user?.employeeId && (
+                    {isPM && visit.project_manager?.id === user?.id && (
                       <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
                         <p className="text-[11px] font-bold text-orange-800">
                           Customer requested a reschedule — do you confirm the new date?
@@ -1005,23 +1004,22 @@ export const SiteVisitManagement: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    {isMD &&
-                      (!visit.project_manager || visit.project_manager.id !== user?.employeeId) && (
-                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
-                          <p className="text-[11px] font-bold text-orange-800 flex items-center gap-2">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            Pending Reschedule Confirmation from PM:{' '}
-                            {visit.project_manager?.full_name || 'Unassigned'}
-                          </p>
-                        </div>
-                      )}
+                    {isMD && (!visit.project_manager || visit.project_manager.id !== user?.id) && (
+                      <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                        <p className="text-[11px] font-bold text-orange-800 flex items-center gap-2">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Pending Reschedule Confirmation from PM:{' '}
+                          {visit.project_manager?.full_name || 'Unassigned'}
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
 
                 {/* ─── CONFIRMED ─── */}
                 {visit.status === 'CONFIRMED' && (
                   <>
-                    {isPM && visit.project_manager?.id === user?.employeeId && (
+                    {isPM && visit.project_manager?.id === user?.id && (
                       <button
                         onClick={() => {
                           setSelectedVisit(visit);
@@ -1033,13 +1031,12 @@ export const SiteVisitManagement: React.FC = () => {
                         <span>Assign Field Agent</span>
                       </button>
                     )}
-                    {isMD &&
-                      (!visit.project_manager || visit.project_manager.id !== user?.employeeId) && (
-                        <div className="w-full py-2 bg-slate-50 border border-slate-200 text-slate-600 font-medium text-[10px] rounded-xl flex items-center justify-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          Waiting for PM to Assign Agent
-                        </div>
-                      )}
+                    {isMD && (!visit.project_manager || visit.project_manager.id !== user?.id) && (
+                      <div className="w-full py-2 bg-slate-50 border border-slate-200 text-slate-600 font-medium text-[10px] rounded-xl flex items-center justify-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        Waiting for PM to Assign Agent
+                      </div>
+                    )}
                   </>
                 )}
 
