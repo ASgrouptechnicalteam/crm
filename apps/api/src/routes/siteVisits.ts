@@ -103,7 +103,7 @@ router.post(
 router.post(
   '/:id/accept',
   authenticateToken,
-  requirePermission([Permissions.SITE_VISITS_ASSIGN_AGENT]),
+  requirePermission([Permissions.SITE_VISITS_ACCEPT]),
   validateRequestBody(SiteVisitAcceptSchema),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {

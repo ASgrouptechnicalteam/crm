@@ -307,6 +307,7 @@ export const TaskManager: React.FC = () => {
             {new Date(t.target_date || '').toLocaleString([], {
               dateStyle: 'short',
               timeStyle: 'short',
+              timeZone: 'Asia/Kolkata',
             })}
           </div>
           {getCountdownBadge(t.target_date || '', t.status || 'PENDING')}

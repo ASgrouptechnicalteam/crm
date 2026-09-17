@@ -256,12 +256,11 @@ export const LeadManagement: React.FC = () => {
   const [bulkHeaderMatched, setBulkHeaderMatched] = useState(true);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
 
-  const isOperatorOrAdmin = (
-    [Roles.DIGITAL_LEAD_OPERATOR, Roles.MARKETING_DIRECTOR, Roles.MD, Roles.ADMIN] as string[]
-  ).includes(activeRole);
-  // ADMIN's RolePermissionsMatrix entry has no leads.* permissions at all —
-  // backend authorization still allows it (authorization.ts's ADMIN bypass),
-  // so it's checked alongside the permission flag here to match.
+  const canBulkUpload =
+    user?.permissions?.includes(Permissions.LEADS_BULK_UPLOAD) ||
+    activeRole === Roles.ADMIN ||
+    activeRole === Roles.MARKETING_DIRECTOR ||
+    activeRole === Roles.MD;
   const canCreateLead =
     !!user?.permissions?.includes(Permissions.LEADS_CREATE) || activeRole === Roles.ADMIN;
 
@@ -364,7 +363,7 @@ export const LeadManagement: React.FC = () => {
         setHasError(true);
       }
 
-      if (isOperatorOrAdmin) {
+      if (canBulkUpload) {
         const monRes = await fetchWithAuth(`${API_BASE_URL}/leads/distribution-monitor`);
         const monData = await monRes.json();
         if (monRes.ok) {
@@ -543,8 +542,8 @@ export const LeadManagement: React.FC = () => {
     }
   };
 
-  const addedByMeUnassigned = leads.filter((l) => l.created_by?.id === user?.id && !l.assigned_to);
-  const baseLeads = leadViewTab === 'added_by_me' ? addedByMeUnassigned : leads;
+  const addedByMe = leads.filter((l) => l.created_by?.id === user?.id);
+  const baseLeads = leadViewTab === 'added_by_me' ? addedByMe : leads;
   const filteredLeads = baseLeads.filter(
     (l) => statusFilter === 'ALL' || l.status === statusFilter,
   );
@@ -696,7 +695,7 @@ export const LeadManagement: React.FC = () => {
             className="hidden"
           />
 
-          {isOperatorOrAdmin && (
+          {canBulkUpload && (
             <button
               onClick={handleBulkUploadBtnClick}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center gap-1.5 shadow"
@@ -706,7 +705,7 @@ export const LeadManagement: React.FC = () => {
             </button>
           )}
 
-          {isOperatorOrAdmin && (
+          {canBulkUpload && (
             <button
               onClick={handleDownloadTemplate}
               title="Download an Excel template with the expected columns"
@@ -742,7 +741,7 @@ export const LeadManagement: React.FC = () => {
       )}
 
       {/* Digital Lead Operator Intake Monitor */}
-      {isOperatorOrAdmin && monitorData && (
+      {canBulkUpload && monitorData && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-navy-900 flex items-center gap-2">
@@ -823,13 +822,9 @@ export const LeadManagement: React.FC = () => {
             }`}
           >
             Leads Added by Me
-            {addedByMeUnassigned.length > 0 && (
-              <span
-                className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] flex items-center justify-center ${
-                  leadViewTab === 'added_by_me' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {addedByMeUnassigned.length}
+            {addedByMe.length > 0 && (
+              <span className="bg-navy-100 text-navy-700 px-2 py-0.5 rounded-full text-xs font-semibold shadow-inner">
+                {addedByMe.length}
               </span>
             )}
           </button>
