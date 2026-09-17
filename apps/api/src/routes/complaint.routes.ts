@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
 import { requireAuthz } from '../middleware/authz';
+import { blankAsAbsent } from '../shared/zodHelpers';
 import { Permissions } from '../shared';
 import { validateRequestBody } from '../middleware/validate';
 import { ComplaintService } from '../services/complaint.service';
@@ -12,7 +13,12 @@ const router = Router();
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'] as const;
 const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REOPENED'] as const;
-const CLOSURE_REASONS = ['RESOLVED', 'CUSTOMER_UNSATISFIED', 'NOT_APPLICABLE', 'CUSTOMER_WITHDRAWN'] as const;
+const CLOSURE_REASONS = [
+  'RESOLVED',
+  'CUSTOMER_UNSATISFIED',
+  'NOT_APPLICABLE',
+  'CUSTOMER_WITHDRAWN',
+] as const;
 
 const CreateComplaintSchema = z.object({
   customer_id: z.number().int().positive(),
@@ -26,7 +32,7 @@ const CreateComplaintSchema = z.object({
 });
 
 const UpdateComplaintSchema = z.object({
-  title: z.string().min(1).optional(),
+  title: blankAsAbsent(z.string().min(1).optional()),
   description: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
   priority: z.enum(PRIORITIES).optional().nullable(),
@@ -34,29 +40,27 @@ const UpdateComplaintSchema = z.object({
 
 const AssignComplaintSchema = z.object({ employee_id: z.number().int().positive() });
 const StatusSchema = z.object({ status: z.enum(STATUSES) });
-const ResolveSchema = z.object({ resolution_description: z.string().min(1, 'resolution_description is required') });
+const ResolveSchema = z.object({
+  resolution_description: z.string().min(1, 'resolution_description is required'),
+});
 const CloseSchema = z.object({ closure_reason: z.enum(CLOSURE_REASONS).optional() });
 
 router.use(authenticateToken);
 
 // GET /api/v1/complaints
-router.get(
-  '/',
-  requireAuthz(Permissions.COMPLAINTS_READ as any),
-  async (req: any, res, next) => {
-    try {
-      const complaints = await ComplaintService.list(req.user, {
-        status: req.query.status as string | undefined,
-        priority: req.query.priority as string | undefined,
-        category: req.query.category as string | undefined,
-        customer_id: req.query.customer_id ? parseInt(req.query.customer_id, 10) : undefined,
-      });
-      res.json(complaints);
-    } catch (error) {
-      next(error);
-    }
+router.get('/', requireAuthz(Permissions.COMPLAINTS_READ as any), async (req: any, res, next) => {
+  try {
+    const complaints = await ComplaintService.list(req.user, {
+      status: req.query.status as string | undefined,
+      priority: req.query.priority as string | undefined,
+      category: req.query.category as string | undefined,
+      customer_id: req.query.customer_id ? parseInt(req.query.customer_id, 10) : undefined,
+    });
+    res.json(complaints);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // GET /api/v1/complaints/:id
 router.get(
@@ -69,7 +73,7 @@ router.get(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // POST /api/v1/complaints
@@ -84,7 +88,7 @@ router.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PATCH /api/v1/complaints/:id
@@ -94,12 +98,16 @@ router.patch(
   validateRequestBody(UpdateComplaintSchema),
   async (req: any, res, next) => {
     try {
-      const complaint = await ComplaintService.update(req.user, parseInt(req.params.id, 10), req.body);
+      const complaint = await ComplaintService.update(
+        req.user,
+        parseInt(req.params.id, 10),
+        req.body,
+      );
       res.json(complaint);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PATCH /api/v1/complaints/:id/status
@@ -109,12 +117,16 @@ router.patch(
   validateRequestBody(StatusSchema),
   async (req: any, res, next) => {
     try {
-      const complaint = await ComplaintService.changeStatus(req.user, parseInt(req.params.id, 10), req.body.status);
+      const complaint = await ComplaintService.changeStatus(
+        req.user,
+        parseInt(req.params.id, 10),
+        req.body.status,
+      );
       res.json(complaint);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PATCH /api/v1/complaints/:id/assign
@@ -124,12 +136,16 @@ router.patch(
   validateRequestBody(AssignComplaintSchema),
   async (req: any, res, next) => {
     try {
-      const complaint = await ComplaintService.assign(req.user, parseInt(req.params.id, 10), req.body.employee_id);
+      const complaint = await ComplaintService.assign(
+        req.user,
+        parseInt(req.params.id, 10),
+        req.body.employee_id,
+      );
       res.json(complaint);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PATCH /api/v1/complaints/:id/resolve
@@ -139,12 +155,16 @@ router.patch(
   validateRequestBody(ResolveSchema),
   async (req: any, res, next) => {
     try {
-      const complaint = await ComplaintService.resolve(req.user, parseInt(req.params.id, 10), req.body.resolution_description);
+      const complaint = await ComplaintService.resolve(
+        req.user,
+        parseInt(req.params.id, 10),
+        req.body.resolution_description,
+      );
       res.json(complaint);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 // PATCH /api/v1/complaints/:id/close
@@ -154,12 +174,16 @@ router.patch(
   validateRequestBody(CloseSchema),
   async (req: any, res, next) => {
     try {
-      const complaint = await ComplaintService.close(req.user, parseInt(req.params.id, 10), req.body.closure_reason);
+      const complaint = await ComplaintService.close(
+        req.user,
+        parseInt(req.params.id, 10),
+        req.body.closure_reason,
+      );
       res.json(complaint);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 export default router;

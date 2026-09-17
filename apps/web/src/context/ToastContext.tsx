@@ -31,7 +31,9 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [errorModal, setErrorModal] = useState<Omit<ToastOptions, 'type' | 'durationMs'> | null>(null);
+  const [errorModal, setErrorModal] = useState<Omit<ToastOptions, 'type' | 'durationMs'> | null>(
+    null,
+  );
 
   const hideToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -41,44 +43,74 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setErrorModal(null);
   }, []);
 
-  const showToast = useCallback((messageOrOptions: string | ToastOptions, fallbackType: ToastType = 'info') => {
-    if (fallbackType === 'error' || (typeof messageOrOptions !== 'string' && messageOrOptions.type === 'error')) {
+  const showToast = useCallback(
+    (messageOrOptions: string | ToastOptions, fallbackType: ToastType = 'info') => {
+      if (
+        fallbackType === 'error' ||
+        (typeof messageOrOptions !== 'string' && messageOrOptions.type === 'error')
+      ) {
+        if (typeof messageOrOptions === 'string') {
+          setErrorModal({ title: 'Error', message: messageOrOptions });
+        } else {
+          setErrorModal(messageOrOptions);
+        }
+        return;
+      }
+
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      let newItem: ToastItem;
+      if (typeof messageOrOptions === 'string') {
+        newItem = { id, message: messageOrOptions, type: fallbackType, durationMs: 4000 };
+      } else {
+        newItem = {
+          id,
+          message: messageOrOptions.message,
+          title: messageOrOptions.title,
+          nextStep: messageOrOptions.nextStep,
+          type: messageOrOptions.type || fallbackType,
+          durationMs: messageOrOptions.durationMs || 4000,
+        };
+      }
+
+      setToasts((prev) => [...prev, newItem]);
+      if (newItem.durationMs && newItem.durationMs > 0) {
+        setTimeout(() => hideToast(id), newItem.durationMs);
+      }
+    },
+    [hideToast],
+  );
+
+  const showError = useCallback(
+    (messageOrOptions: string | Omit<ToastOptions, 'type' | 'durationMs'>) => {
       if (typeof messageOrOptions === 'string') {
         setErrorModal({ title: 'Error', message: messageOrOptions });
       } else {
         setErrorModal(messageOrOptions);
       }
-      return;
-    }
+    },
+    [],
+  );
 
-    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    let newItem: ToastItem;
-    if (typeof messageOrOptions === 'string') {
-      newItem = { id, message: messageOrOptions, type: fallbackType, durationMs: 4000 };
-    } else {
-      newItem = {
-        id,
-        message: messageOrOptions.message,
-        title: messageOrOptions.title,
-        nextStep: messageOrOptions.nextStep,
-        type: messageOrOptions.type || fallbackType,
-        durationMs: messageOrOptions.durationMs || 4000
-      };
-    }
-
-    setToasts((prev) => [...prev, newItem]);
-    if (newItem.durationMs && newItem.durationMs > 0) {
-      setTimeout(() => hideToast(id), newItem.durationMs);
-    }
-  }, [hideToast]);
-
-  const showError = useCallback((messageOrOptions: string | Omit<ToastOptions, 'type' | 'durationMs'>) => {
-    if (typeof messageOrOptions === 'string') {
-      setErrorModal({ title: 'Error', message: messageOrOptions });
-    } else {
-      setErrorModal(messageOrOptions);
-    }
-  }, []);
+  useEffect(() => {
+    const handleAuthLogout = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        showError({ title: 'Session Expired', message: customEvent.detail });
+      }
+    };
+    const handleAuthForbidden = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        showError({ title: 'Permission Denied', message: customEvent.detail });
+      }
+    };
+    window.addEventListener('auth:force_logout', handleAuthLogout);
+    window.addEventListener('auth:forbidden', handleAuthForbidden);
+    return () => {
+      window.removeEventListener('auth:force_logout', handleAuthLogout);
+      window.removeEventListener('auth:forbidden', handleAuthForbidden);
+    };
+  }, [showError]);
 
   return (
     <ToastContext.Provider value={{ showToast, showError, hideToast }}>
@@ -95,8 +127,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 isSuccess
                   ? 'bg-navy-900/95 border-navy-700 text-navy-100'
                   : isWarning
-                  ? 'bg-amber-900/95 border-amber-700 text-amber-100'
-                  : 'bg-slate-900/95 border-slate-700 text-slate-100'
+                    ? 'bg-amber-900/95 border-amber-700 text-amber-100'
+                    : 'bg-slate-900/95 border-slate-700 text-slate-100'
               }`}
             >
               <div className="pt-0.5">
@@ -136,17 +168,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               <h2 className="text-xl font-bold text-rose-900 leading-tight">
                 {errorModal.title || 'Error'}
               </h2>
-              <button 
-                onClick={hideErrorModal} 
+              <button
+                onClick={hideErrorModal}
                 className="ml-auto p-2 text-rose-400 hover:text-rose-600 rounded-full hover:bg-rose-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6">
-              <p className="text-slate-700 text-base mb-4 leading-relaxed">
-                {errorModal.message}
-              </p>
+              <p className="text-slate-700 text-base mb-4 leading-relaxed">{errorModal.message}</p>
               {errorModal.nextStep && (
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 mt-2">
                   <p className="text-sm font-semibold text-slate-800 mb-1">What to do next:</p>

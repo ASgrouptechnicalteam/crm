@@ -100,6 +100,8 @@ export class SiteVisitPolicy {
     if (!(user.permissions || []).includes(Permissions.SITE_VISITS_ASSIGN_AGENT)) {
       return false;
     }
+    if (this.isManagement(user)) return true;
+
     // The routed PM/Agent is the acceptor.
     return visit.project_manager_id === user.employeeId;
   }

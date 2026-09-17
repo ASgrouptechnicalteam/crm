@@ -4,8 +4,8 @@ import { blankAsAbsent } from './zodHelpers';
 export const EmptyBodySchema = z.object({}).strict();
 
 export const EmployeeSelfUpdateSchema = z.object({
-  full_name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
+  full_name: blankAsAbsent(z.string().min(1).optional()),
+  phone: blankAsAbsent(z.string().min(10).optional()),
   secondary_phone: z.string().optional().nullable(),
   whatsapp_number: z.string().optional().nullable(),
   current_address: z.string().optional().nullable(),
@@ -134,7 +134,7 @@ export const EmployeeResignSchema = z.object({
 
 export const EmployeePromoteSchema = z
   .object({
-    job_title: z.string().min(1).optional(),
+    job_title: blankAsAbsent(z.string().min(1).optional()),
     salary_ctc: z.union([z.string(), z.number()]).optional(),
     role_name: z.string().optional(),
     reason: z.string().optional(),

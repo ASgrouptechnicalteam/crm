@@ -171,6 +171,13 @@ export const LeadStatusUpdateSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.status === 'DROPPED' && !data.exit_reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['exit_reason'],
+        message: 'exit_reason is required when dropping a lead',
+      });
+    }
     if (data.exit_reason === 'OTHER' && !data.exit_reason_detail) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

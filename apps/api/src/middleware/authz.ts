@@ -38,7 +38,7 @@ export const requireAuthz = (
       if (!isAuthorized) {
         return res
           .status(403)
-          .json({ error: 'Forbidden: Insufficient access or out of scope', code: 'FORBIDDEN' });
+          .json({ error: `Forbidden: Missing required permission (${action})`, code: 'FORBIDDEN' });
       }
 
       if (resource) {

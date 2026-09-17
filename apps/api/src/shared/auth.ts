@@ -9,6 +9,9 @@ export const CompanySchema = z.object({
 
 export type Company = z.infer<typeof CompanySchema>;
 
+// Bump this number whenever hardcoded permissions change. This will force all existing users to re-login.
+export const PERMISSIONS_VERSION = 1;
+
 // Roles
 export const Roles = {
   MD: 'Managing director',

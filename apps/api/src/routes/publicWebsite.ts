@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { Router, Response } from 'express';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { prisma, publicPrisma } from '../lib/prisma';
 import { correlationId } from '../middleware/correlationId';
 import { publicReadLimiter, publicWriteLimiter } from '../middleware/rateLimiter';
 import { authenticatePublicKey } from '../middleware/publicApiKey';
@@ -24,7 +24,7 @@ import { buildRecommendations } from '../services/search/recommendations';
 import { parseNaturalLanguageQuery } from '../services/search/aiParse';
 
 const router = Router();
-const p = prisma;
+const p = publicPrisma;
 
 router.use(correlationId);
 router.use(publicReadLimiter);

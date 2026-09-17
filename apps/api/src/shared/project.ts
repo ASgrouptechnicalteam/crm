@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { blankAsAbsent } from './zodHelpers';
 
 // Project Constants & Schemas
 // MIXED/COMMERCIAL kept for backward compatibility with existing rows — see
@@ -91,9 +92,9 @@ export const ProjectCreateSchema = z.object({
 export type ProjectCreateInput = z.infer<typeof ProjectCreateSchema>;
 
 export const ProjectUpdateSchema = z.object({
-  name: z.string().min(3).optional(),
+  name: blankAsAbsent(z.string().min(3).optional()),
   description: z.string().optional().nullable(),
-  location: z.string().min(3).optional(),
+  location: blankAsAbsent(z.string().min(3).optional()),
   total_area: z.string().optional().nullable(),
   total_units: z.number().int().positive().optional().nullable(),
   launch_date: z.string().optional().nullable(),

@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { verifyAccessToken, TokenPayload } from '../utils/jwt';
 import { prisma } from '../lib/prisma';
+import { PERMISSIONS_VERSION } from '../shared/auth';
 
 export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
@@ -35,7 +36,11 @@ const timingSafeEqual = (a: string, b: string): boolean => {
  * Validates a Service Bearer Secret against PORTAL_CRM_SECRET (constant-time comparison).
  * Does NOT require a user JWT — service tokens do not carry user identity.
  */
-export const authenticateServiceToken = (req: ServiceRequest, res: Response, next: NextFunction) => {
+export const authenticateServiceToken = (
+  req: ServiceRequest,
+  res: Response,
+  next: NextFunction,
+) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -65,7 +70,11 @@ export const authenticateServiceToken = (req: ServiceRequest, res: Response, nex
   next();
 };
 
-export const authenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -102,6 +111,13 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
       return res.status(401).json({ error: 'User is inactive or suspended', code: 'UNAUTHORIZED' });
     }
 
+    if (payload.permsVersion !== PERMISSIONS_VERSION) {
+      logger.error('AUTH_FAIL: Permissions version stale');
+      return res
+        .status(401)
+        .json({ error: 'Permissions updated. Please log in again.', code: 'TOKEN_EXPIRED' });
+    }
+
     if (payload.tokenVersion !== employee.token_version) {
       logger.error('AUTH_FAIL: Token version stale');
       return res.status(401).json({ error: 'Token version stale', code: 'TOKEN_EXPIRED' });
@@ -127,7 +143,9 @@ export const requireRole = (allowedRoles: string[]) => {
 
     const hasRole = (req.user.roles || []).some((r) => allowedRoles.includes(r));
     if (!hasRole) {
-      return res.status(403).json({ error: 'Forbidden: Insufficient privileges', code: 'FORBIDDEN' });
+      return res
+        .status(403)
+        .json({ error: 'Forbidden: Insufficient privileges', code: 'FORBIDDEN' });
     }
 
     next();
@@ -160,7 +178,11 @@ export const requirePermission = (requiredPermissions: string[]) => {
  * kill active sessions immediately.
  * Attaches kiosk info to req.kiosk.
  */
-export const authenticateKioskToken = async (req: KioskAuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticateKioskToken = async (
+  req: KioskAuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -198,11 +220,15 @@ export const authenticateKioskToken = async (req: KioskAuthenticatedRequest, res
     }
 
     if (!kioskCred.is_active) {
-      return res.status(401).json({ error: 'Kiosk credential is deactivated', code: 'UNAUTHORIZED' });
+      return res
+        .status(401)
+        .json({ error: 'Kiosk credential is deactivated', code: 'UNAUTHORIZED' });
     }
 
     if (payload.credentialVersion !== kioskCred.credential_version) {
-      return res.status(401).json({ error: 'Kiosk token version stale — please log in again', code: 'TOKEN_EXPIRED' });
+      return res
+        .status(401)
+        .json({ error: 'Kiosk token version stale — please log in again', code: 'TOKEN_EXPIRED' });
     }
 
     req.kiosk = {

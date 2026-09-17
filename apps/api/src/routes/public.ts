@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { prisma } from '../lib/prisma';
+import { prisma, publicPrisma } from '../lib/prisma';
 import { Router, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PublicLeadCreateSchema } from '../shared';
@@ -12,7 +12,7 @@ import { createLead } from '../services/lead/create';
 
 const router = Router();
 
-const p = prisma;
+const p = publicPrisma;
 
 router.get('/companies', async (req, res) => {
   try {

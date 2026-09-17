@@ -15,6 +15,7 @@ export interface TokenPayload {
   branchId: number | null;
   roles: string[];
   permissions: string[];
+  permsVersion?: number;
   tokenVersion?: number;
   /** Kiosk-only fields — only present when type === 'KIOSK' */
   type?: 'KIOSK' | 'EMPLOYEE';
@@ -22,6 +23,8 @@ export interface TokenPayload {
   credentialVersion?: number;
   createdAt?: number;
 }
+
+import { PERMISSIONS_VERSION } from '../shared/auth';
 
 // § Phase 6: a staff session is now meant to persist until the employee
 // explicitly logs out (or gets revoked via token_version) — like Instagram,
@@ -32,6 +35,7 @@ export const generateAccessToken = (payload: TokenPayload, expiresIn: string = '
   const finalPayload = {
     ...payload,
     tokenVersion: payload.tokenVersion ?? 1,
+    permsVersion: PERMISSIONS_VERSION,
   };
   return jwt.sign(finalPayload, JWT_ACCESS_SECRET, { expiresIn } as jwt.SignOptions);
 };

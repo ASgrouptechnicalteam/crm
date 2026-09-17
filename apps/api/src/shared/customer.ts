@@ -16,9 +16,9 @@ export const CustomerCreateSchema = z.object({
 });
 
 export const CustomerUpdateSchema = z.object({
-  first_name: z.string().min(2).optional(),
+  first_name: blankAsAbsent(z.string().min(2).optional()),
   last_name: z.string().optional(),
-  phone: z.string().min(10).optional(),
+  phone: blankAsAbsent(z.string().min(10).optional()),
   email: blankAsAbsent(z.string().email().optional()),
   status: z.string().optional(),
 });

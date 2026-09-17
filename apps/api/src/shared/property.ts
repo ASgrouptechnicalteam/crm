@@ -465,7 +465,7 @@ export type PropertyMDApprovalInput = z.infer<typeof PropertyMDApprovalSchema>;
 
 export const PropertyUpdateSchema = z.object({
   status: z.string().optional(),
-  title: z.string().min(3).optional(),
+  title: blankAsAbsent(z.string().min(3).optional()),
   // .nullable(): PropertyForm.tsx (Rebuild Phase 5) always sends the full
   // fetched property back on submit (like ProjectWizard.tsx does for
   // Project), so any field the DB can hold as null must accept null here too
@@ -476,7 +476,7 @@ export const PropertyUpdateSchema = z.object({
   brand_type: z.enum(['SONTHILLU', 'RADHA_REAL_HOMES']).optional(),
   category: z.string().optional(),
   area_sqft: z.number().positive().optional(),
-  location: z.string().min(3).optional(),
+  location: blankAsAbsent(z.string().min(3).optional()),
   address: z.string().optional().nullable(),
   bedrooms: z.number().int().optional().nullable(),
   bathrooms: z.number().int().optional().nullable(),

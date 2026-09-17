@@ -264,6 +264,8 @@ router.get(
 
       const formatted = assignees.map((e) => ({
         id: e.id,
+        full_name: e.full_name,
+        employee_code: e.employee_code,
         label: `${e.full_name || e.employee_code} (${e.job_title || e.roles.map((r) => r.role.name).join(', ')})`,
       }));
 

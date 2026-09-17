@@ -3,6 +3,7 @@ import { Router, Response, Request } from 'express';
 import { prisma } from '../lib/prisma';
 import { generateAccessToken, TokenPayload } from '../utils/jwt';
 import { authenticateToken, AuthenticatedRequest, requireRole } from '../middleware/auth';
+import { blankAsAbsent } from '../shared/zodHelpers';
 import { Roles } from '../shared';
 import bcrypt from 'bcryptjs';
 import { validateRequestBody } from '../middleware/validate';
@@ -26,8 +27,8 @@ export const KioskCredentialCreateSchema = z.object({
 });
 
 export const KioskCredentialUpdateSchema = z.object({
-  label: z.string().trim().min(1).optional(),
-  password: z.string().min(8).optional(),
+  label: blankAsAbsent(z.string().trim().min(1).optional()),
+  password: blankAsAbsent(z.string().min(8).optional()),
   is_active: z.boolean().optional(),
   branch_id: z.number().int().positive().optional(),
 });

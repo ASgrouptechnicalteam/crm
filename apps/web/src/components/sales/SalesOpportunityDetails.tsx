@@ -129,7 +129,8 @@ export const SalesOpportunityDetails: React.FC<SalesOpportunityDetailsProps> = (
   const currentStage = opportunity.lead?.status || 'UNKNOWN';
   const stageColorClass =
     SALES_STAGE_COLORS[currentStage] || 'bg-slate-100 text-slate-700 border-slate-200';
-  const needsFinalization = !opportunity.property_id || !opportunity.expected_value;
+  const needsFinalization =
+    (!opportunity.property_id && !opportunity.project_unit_id) || !opportunity.expected_value;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-sm">
@@ -309,7 +310,9 @@ export const SalesOpportunityDetails: React.FC<SalesOpportunityDetailsProps> = (
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Target Property</p>
                   <p className="font-medium text-slate-800">
-                    {opportunity.property?.title || 'Not set'}
+                    {opportunity.property?.title ||
+                      opportunity.project_unit?.unit_number ||
+                      'Not set'}
                   </p>
                 </div>
                 <div>
@@ -354,7 +357,7 @@ export const SalesOpportunityDetails: React.FC<SalesOpportunityDetailsProps> = (
                 <p className="text-xs font-semibold text-slate-500">Property</p>
                 <div className="flex items-center gap-1 font-medium text-slate-800">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {opportunity.property?.title || 'N/A'}
+                  {opportunity.property?.title || opportunity.project_unit?.unit_number || 'N/A'}
                 </div>
               </div>
             </div>

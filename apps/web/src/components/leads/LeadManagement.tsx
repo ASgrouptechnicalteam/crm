@@ -192,16 +192,45 @@ const LeadCard: React.FC<LeadCardProps> = ({
 export const LeadManagement: React.FC = () => {
   const { user, fetchWithAuth, activeRole } = useAuth();
   const { showToast, showError } = useToast();
-  const [searchParams] = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [monitorData, setMonitorData] = useState<MonitorData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Lets dashboard widgets (e.g. the MD/Admin Lead Pipeline cards) deep-link
   // straight into a pre-filtered view via /leads?status=X.
-  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'ALL');
+  const [statusFilter, setStatusFilterState] = useState<string>(
+    searchParams.get('status') || 'ALL',
+  );
   const [leadSearchQuery, setLeadSearchQuery] = useState<string>('');
-  const [leadViewTab, setLeadViewTab] = useState<'pipeline' | 'added_by_me'>('pipeline');
+  const [leadViewTab, setLeadViewTabState] = useState<'pipeline' | 'added_by_me'>(
+    (searchParams.get('tab') as 'pipeline' | 'added_by_me') || 'pipeline',
+  );
+
+  const setStatusFilter = (val: string) => {
+    setStatusFilterState(val);
+    setSearchParams(
+      (prev) => {
+        if (val === 'ALL') prev.delete('status');
+        else prev.set('status', val);
+        return prev;
+      },
+      { replace: true },
+    );
+  };
+
+  const setLeadViewTab = (val: 'pipeline' | 'added_by_me') => {
+    setLeadViewTabState(val);
+    setSearchParams(
+      (prev) => {
+        if (val === 'pipeline') prev.delete('tab');
+        else prev.set('tab', val);
+        return prev;
+      },
+      { replace: true },
+    );
+  };
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
 
   const fetchEmployees = async () => {
@@ -701,7 +730,9 @@ export const LeadManagement: React.FC = () => {
         </div>
       </div>
 
-      <UnclaimedLeadsBanner onClaimed={fetchLeads} />
+      {user?.permissions?.includes(Permissions.LEADS_UPDATE) && (
+        <UnclaimedLeadsBanner onClaimed={fetchLeads} />
+      )}
 
       {hasError && (
         <div className="text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-4 py-3 flex items-center gap-2">

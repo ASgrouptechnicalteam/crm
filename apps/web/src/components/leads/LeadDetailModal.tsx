@@ -36,6 +36,7 @@ import { QualificationFormModal } from './QualificationFormModal';
 import { getPropertyTypeLabel } from '../../constants/propertyTypes';
 import { getLeadStatusLabel } from '../../constants/leadStatus';
 import { toUserFacingError } from '../../utils/userFacingError';
+import { DropLeadModal } from './DropLeadModal';
 
 interface Lead {
   id: number;
@@ -108,6 +109,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   >('DETAILS');
   const [activeTab, setActiveTab] = useState('DETAILS');
   const [showQualifyModal, setShowQualifyModal] = useState(false);
+  const [showDropModal, setShowDropModal] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
 
   const [matches, setMatches] = useState<MatchItem[]>([]);
@@ -762,13 +764,17 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                       .map((st) => (
                         <button
                           key={st}
-                          onClick={() =>
-                            st === 'DEMO_SCHEDULED'
-                              ? setShowDemoScheduleModal(true)
-                              : st === 'QUALIFIED'
-                                ? setShowQualifyModal(true)
-                                : onUpdateStatus(lead.id, st)
-                          }
+                          onClick={() => {
+                            if (st === 'DEMO_SCHEDULED') {
+                              setShowDemoScheduleModal(true);
+                            } else if (st === 'QUALIFIED') {
+                              setShowQualifyModal(true);
+                            } else if (st === 'DROPPED') {
+                              setShowDropModal(true);
+                            } else {
+                              onUpdateStatus(lead.id, st);
+                            }
+                          }}
                           disabled={lead.can_edit === false}
                           className={`px-4 py-2 bg-white hover:bg-slate-50 text-navy-700 border border-slate-200 font-semibold text-xs rounded-lg transition-colors ${lead.can_edit === false ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -866,8 +872,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     Evaluating live property matches...
                   </div>
                 ) : matches.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-slate-400 bg-surface rounded-xl border border-slate-100">
-                    No properties or project units currently match this lead's requirements.
+                  <div className="py-8 px-6 text-center text-sm text-slate-400 bg-surface rounded-xl border border-slate-100">
+                    {(!lead.budget_min && !lead.budget_max) ||
+                    !lead.property_type ||
+                    !lead.preferred_location
+                      ? "No matches yet — please fill in this lead's budget, property type, and preferred location."
+                      : "No properties or project units currently match this lead's requirements."}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1782,6 +1792,31 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             showToast('Qualification details updated', 'success');
             onRefreshLeads();
             setShowQualificationModal(false);
+          }}
+        />
+      )}
+      {showDropModal && (
+        <DropLeadModal
+          onClose={() => setShowDropModal(false)}
+          onConfirm={async (reason, detail) => {
+            const patchRes = await fetchWithAuth(`${API_BASE_URL}/leads/${lead.id}/status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                status: 'DROPPED',
+                exit_reason: reason,
+                exit_reason_detail: detail,
+              }),
+            });
+            const resData = await patchRes.json().catch(() => ({}));
+            if (!patchRes.ok) {
+              const formatted = toUserFacingError({ status: patchRes.status, body: resData });
+              showToast({ ...formatted, type: 'error' });
+              return;
+            }
+            showToast('Lead dropped', 'success');
+            onRefreshLeads();
+            setShowDropModal(false);
           }}
         />
       )}

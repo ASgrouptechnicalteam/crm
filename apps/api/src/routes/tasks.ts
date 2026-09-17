@@ -163,6 +163,7 @@ router.post(
           title,
           description,
           assignee_id,
+          priority,
           created_by: creatorId,
           status: 'PENDING',
           target_date: deadline ? new Date(deadline) : new Date(Date.now() + 86400000),
@@ -194,12 +195,6 @@ router.get(
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const taskId = parseInt(req.params.id, 10);
-      if (isNaN(taskId))
-        return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      if (isNaN(taskId))
-        return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
-      if (isNaN(taskId))
-        return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
       if (isNaN(taskId))
         return next({ name: 'AppError', statusCode: 400, message: 'Invalid ID format' });
 

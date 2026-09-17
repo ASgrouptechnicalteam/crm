@@ -355,7 +355,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const res = await fetch(url, { ...options, headers });
 
+    if (res.status === 403) {
+      const clone = res.clone();
+      const body = await clone.json().catch(() => ({}));
+      window.dispatchEvent(
+        new CustomEvent('auth:forbidden', {
+          detail: body.error || 'Forbidden: Insufficient permissions',
+        }),
+      );
+      return res;
+    }
+
     if (res.status === 401) {
+      const clone = res.clone();
+      const body = await clone.json().catch(() => ({}));
+      if (body.error === 'Permissions updated. Please log in again.') {
+        logout();
+        window.dispatchEvent(new CustomEvent('auth:force_logout', { detail: body.error }));
+        return res;
+      }
+
       const result = await refreshAccessToken();
 
       if (result.success) {
