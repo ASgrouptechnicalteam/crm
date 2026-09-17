@@ -75,6 +75,7 @@ export const PerformanceScoreWidget: React.FC = () => {
   const tier = breakdown.tier;
   const tierBoostBonus = breakdown.tierBoostBonus || 0;
   const tierPenaltyExtra = breakdown.tierPenaltyExtra || 0;
+  const manualAdjustmentsTotal = breakdown.manualAdjustmentsTotal || 0;
 
   const displayScore = scoreData?.score !== undefined ? scoreData.score : 50.0;
 
@@ -212,6 +213,24 @@ export const PerformanceScoreWidget: React.FC = () => {
             <span>Sub-Target Logs (-1.0)</span>
             <span className="font-mono font-bold text-red-700">-{belowTargetPenalty}</span>
           </div>
+
+          {manualAdjustmentsTotal !== 0 && (
+            <div
+              className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                manualAdjustmentsTotal > 0
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200/60'
+                  : 'bg-red-50 text-red-900 border-red-200/60'
+              }`}
+            >
+              <span>HR/MD Adjustments</span>
+              <span
+                className={`font-mono font-bold ${manualAdjustmentsTotal > 0 ? 'text-emerald-700' : 'text-red-700'}`}
+              >
+                {manualAdjustmentsTotal > 0 ? '+' : ''}
+                {manualAdjustmentsTotal}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -23,6 +23,7 @@ export interface UserProfile {
   roles: string[];
   permissions?: string[];
   attendanceRequired: boolean;
+  reportRequired: boolean;
   firstLoginDone: boolean;
   phone?: string | null;
   secondaryPhone?: string | null;

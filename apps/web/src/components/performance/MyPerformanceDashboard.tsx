@@ -43,6 +43,8 @@ interface PerformanceBreakdown {
   missingDailyReportPenalty: number;
   completedAllWorkEvents: number;
   completedAllWorkBoost: number;
+  manualAdjustmentsTotal: number;
+  manualAdjustmentsCount: number;
 }
 
 interface MyScore {
@@ -262,7 +264,8 @@ export const MyPerformanceDashboard: React.FC = () => {
                     breakdown.presentBoost +
                     breakdown.propertyBookingBoost +
                     (breakdown.targetExceededBoost || 0) +
-                    (breakdown.completedAllWorkBoost || 0)
+                    (breakdown.completedAllWorkBoost || 0) +
+                    (breakdown.manualAdjustmentsTotal > 0 ? breakdown.manualAdjustmentsTotal : 0)
                   ).toFixed(1)}
                 </span>
               </div>
@@ -277,7 +280,10 @@ export const MyPerformanceDashboard: React.FC = () => {
                     breakdown.overduePenalty +
                     breakdown.uninformedAbsentPenalty +
                     (breakdown.midnightAutoCheckoutPenalty || 0) +
-                    (breakdown.missingDailyReportPenalty || 0)
+                    (breakdown.missingDailyReportPenalty || 0) +
+                    (breakdown.manualAdjustmentsTotal < 0
+                      ? Math.abs(breakdown.manualAdjustmentsTotal)
+                      : 0)
                   ).toFixed(1)}
                 </span>
               </div>

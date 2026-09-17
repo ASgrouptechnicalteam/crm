@@ -295,6 +295,7 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
                   <option value="accountant">accountant</option>
                   <option value="Managing director">Managing director (MD)</option>
                   <option value="Admin (Technical)">System Admin</option>
+                  <option value="Staff">Staff</option>
                 </select>
               </div>
 
@@ -466,7 +467,7 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
                     <input
                       type="text"
                       value={panNumber}
-                      onChange={(e) => setPanNumber(e.target.value)}
+                      onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
                       className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500 font-mono uppercase"
                       placeholder="ABCDE1234F"
                     />
@@ -704,7 +705,7 @@ export const AddEmployeeWizard: React.FC<AddEmployeeWizardProps> = ({
                   <input
                     type="text"
                     value={bankIfsc}
-                    onChange={(e) => setBankIfsc(e.target.value)}
+                    onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
                     className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500 font-mono uppercase"
                     placeholder="HDFC0001234"
                   />

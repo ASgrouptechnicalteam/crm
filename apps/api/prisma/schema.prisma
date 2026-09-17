@@ -333,6 +333,8 @@ model Employee {
   assigned_tasks                Task[]                       @relation("AssignedTasks")
   notifications                 Notification[]
   performance_snapshots         PerformanceSnapshot[]
+  performance_adjustments       PerformanceAdjustment[]      @relation("PerformanceAdjustments")
+  made_performance_adjustments  PerformanceAdjustment[]      @relation("MadePerformanceAdjustments")
   daily_targets                 DailyTarget[]
   assigned_leads                Lead[]                       @relation("AssignedLeads")
   created_leads                 Lead[]                       @relation("CreatedLeads")
@@ -2735,3 +2737,18 @@ model PropertyFarmLandDetails {
 }
 
 
+
+model PerformanceAdjustment {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  adjuster_id Int      
+  points      Float    
+  reason      String   @db.Text
+  created_at  DateTime @default(now())
+
+  employee    Employee @relation("PerformanceAdjustments", fields: [employee_id], references: [id], onDelete: Cascade)
+  adjuster    Employee @relation("MadePerformanceAdjustments", fields: [adjuster_id], references: [id], onDelete: Restrict)
+  
+  @@index([employee_id])
+  @@index([created_at])
+}

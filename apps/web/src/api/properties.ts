@@ -32,6 +32,7 @@ export type PropertyCategory =
 export type PropertySalesStatus =
   'AVAILABLE' | 'HOLD' | 'RESERVED' | 'BOOKED' | 'SOLD' | 'BLOCKED' | 'UNAVAILABLE';
 export type PropertyPipelineStatus =
+  | 'DRAFT'
   | 'PENDING_VERIFICATION'
   | 'PENDING_DM_POLISH'
   | 'PENDING_MD_APPROVAL'
@@ -46,6 +47,7 @@ export type PropertyPipelineStatus =
  * vocabulary (Phase 1's migration added these to Property so "one form
  * serves both" — Phase 5 finally wires them through this client). */
 export interface PropertyInput {
+  status?: string;
   title: string;
   description?: string | null;
   brand_type: 'SONTHILLU' | 'RADHA_REAL_HOMES';

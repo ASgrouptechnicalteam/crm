@@ -195,7 +195,17 @@ export async function createLead(
     // was already threaded through to the activity/notification writes
     // below but was never actually populated — this was the missing wire.
     ownershipType = 'POOL';
-    bestAssignee = await findBestAssigneeForLead(user.companyId);
+    let preferredPmId: number | undefined = undefined;
+    if (dto.project_id) {
+      const project = await p.project.findUnique({
+        where: { id: dto.project_id },
+        select: { assigned_pm_id: true },
+      });
+      if (project?.assigned_pm_id) {
+        preferredPmId = project.assigned_pm_id;
+      }
+    }
+    bestAssignee = await findBestAssigneeForLead(user.companyId, preferredPmId);
     if (bestAssignee) {
       assignedToId = bestAssignee.employeeId;
       assignmentType = 'PERFORMANCE_WEIGHTED';

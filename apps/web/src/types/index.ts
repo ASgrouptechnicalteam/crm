@@ -32,6 +32,7 @@ export interface EmployeeListItem {
   branch?: string;
   branch_id?: number | null;
   attendanceRequired?: boolean;
+  reportRequired?: boolean;
   role?: { name?: string | null } | null;
   company_id?: number;
   // POST /auth/login flattens this to a plain string (see apps/api/src/routes/auth.ts);
@@ -952,5 +953,7 @@ export interface PerformanceScoreResponse {
     tierPenaltyMultiplier?: number;
     tierBoostBonus?: number;
     tierPenaltyExtra?: number;
+    manualAdjustmentsTotal?: number;
+    manualAdjustmentsCount?: number;
   } | null;
 }

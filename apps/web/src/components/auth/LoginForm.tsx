@@ -108,6 +108,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           // (Edit Project, Add Units, etc.) app-wide regardless of the user's role.
           permissions: u.permissions || [],
           attendanceRequired: u.attendanceRequired ?? true,
+          reportRequired: u.reportRequired ?? true,
           firstLoginDone: u.firstLoginDone ?? false,
         };
         login(userProfile, responseJson.accessToken, responseJson.refreshToken);

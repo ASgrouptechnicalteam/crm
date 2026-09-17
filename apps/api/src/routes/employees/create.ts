@@ -47,6 +47,7 @@ router.post(
         job_title,
         department,
         employment_type,
+        report_required,
         reporting_manager_id,
         date_of_joining,
         salary_ctc,
@@ -186,7 +187,7 @@ router.post(
           // silently exempting them from the kiosk logout gate (see
           // routes/attendance/qr.ts). Still overridable per-employee via the
           // existing admin-actions endpoint for genuine exceptions.
-          report_required: true,
+          report_required: report_required !== undefined ? Boolean(report_required) : true,
           reporting_manager_id: reporting_manager_id ? parseInt(reporting_manager_id, 10) : null,
           date_of_joining: date_of_joining ? new Date(date_of_joining) : new Date(),
           salary_ctc: salary_ctc ? parseFloat(salary_ctc) : 35000,

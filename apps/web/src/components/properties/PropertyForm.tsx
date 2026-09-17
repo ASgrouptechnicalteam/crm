@@ -336,8 +336,34 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
       if (!form.title.trim()) return 'Title is required';
     }
     if (STEPS[s] === 'Location' && !form.location.trim()) return 'Location is required';
-    if (STEPS[s] === 'Size & Details' && deriveOverallAreaSqft() <= 0)
-      return 'Please enter the primary area in the details section (e.g., Plot Area, Super Built-up Area, or Total Area).';
+    if (STEPS[s] === 'Size & Details') {
+      if (deriveOverallAreaSqft() <= 0)
+        return 'Please enter the primary area in the details section (e.g., Plot Area, Super Built-up Area, or Total Area).';
+      const c = form.category;
+      if (
+        [
+          'APARTMENT',
+          'VILLA',
+          'INDEPENDENT_HOUSE',
+          'INDEPENDENT_FLOOR',
+          'DUPLEX',
+          'PENTHOUSE',
+          'STUDIO',
+        ].includes(c)
+      ) {
+        if (!form.bedrooms) return 'Bedrooms is required for this property type';
+        if (!form.bathrooms) return 'Bathrooms is required for this property type';
+        if (!form.facing) return 'Facing is required for this property type';
+      }
+      if (['PLOT', 'FARM_HOUSE', 'AGRICULTURAL_LAND'].includes(c)) {
+        if (!form.plot_area_sqyd) return 'Plot Area is required';
+        if (!form.facing) return 'Facing is required for this property type';
+      }
+      if (['COMMERCIAL_SHOP', 'COMMERCIAL_OFFICE'].includes(c)) {
+        if (!form.built_up_area_sqft && !form.carpet_area_sqft)
+          return 'Built-up Area or Carpet Area is required';
+      }
+    }
     if (STEPS[s] === 'Pricing' && (!form.base_rate || form.base_rate <= 0))
       return 'Base rate is required';
     return null;
@@ -352,6 +378,39 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
+
+  const handleSaveDraft = async () => {
+    if (!form.title.trim()) {
+      showError({ message: 'Title is required even for a draft.' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload = buildPayload(form, details);
+      payload.status = 'DRAFT' as any;
+      payload.area_sqft = deriveOverallAreaSqft() || 0;
+
+      if (mode === 'create') {
+        const { property: created } = await createProperty(fetchWithAuth, payload);
+        showToast('Draft saved successfully', 'success');
+        onSuccess(created);
+      } else if (property) {
+        const { property: updated } = await updateProperty(fetchWithAuth, property.id, payload);
+        showToast('Draft updated', 'success');
+        onSuccess(updated);
+      }
+    } catch (err: any) {
+      if (err?.res) {
+        await handleApiError(err.res, showError, err.data);
+      } else {
+        showError(
+          toUserFacingError({ message: err?.message || 'Failed to save draft', body: err }),
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     for (let s = 0; s < STEPS.length - 1; s++) {
@@ -2240,6 +2299,13 @@ export const PropertyForm: React.FC<PropertyFormProps> = ({
             )}
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleSaveDraft}
+              disabled={submitting}
+              className="px-5 py-2.5 text-amber-600 font-bold hover:bg-amber-50 rounded-xl border border-amber-200 text-sm disabled:opacity-60"
+            >
+              Save as Draft
+            </button>
             <button
               onClick={onClose}
               className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-200 rounded-xl text-sm"

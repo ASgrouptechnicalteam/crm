@@ -325,6 +325,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                     <option value="accountant">Accountant</option>
                     <option value="Managing director">Managing Director (MD)</option>
                     <option value="Admin (Technical)">System Admin</option>
+                    <option value="Staff">Staff</option>
                   </select>
                 </div>
 
@@ -520,8 +521,8 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                     <input
                       type="text"
                       value={panNumber}
-                      onChange={(e) => setPanNumber(e.target.value)}
-                      className="w-full p-3 pl-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500"
+                      onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+                      className="w-full p-3 pl-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-navy-500 font-mono uppercase"
                     />
                   </div>
                 </div>

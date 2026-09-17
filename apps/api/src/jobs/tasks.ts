@@ -180,12 +180,14 @@ export const staleLeadFlaggingJob = async () => {
 export const dailyAttendanceRollupJob = async (referenceDate: Date = new Date()) => {
   logger.info('Executing Daily Attendance Rollup...');
 
-  // The job fires at IST midnight, so "today" per getISTComponents() at this
-  // exact moment IS the boundary we want -- anyone still checked in from
-  // before this instant gets force-closed. Using `lt` (not a same-day range)
-  // is deliberately self-healing: if a prior run failed, older open logs
-  // still get caught here rather than silently skipped forever.
-  const todayIST = getISTComponents(referenceDate);
+  // The job fires at 23:58 IST, so "today" per getISTComponents() at this
+  // exact moment is technically still the day being evaluated.
+  // By adding 10 minutes to the reference date, we safely push the evaluation time
+  // past midnight (to 00:08). This perfectly aligns with the old logic where
+  // todayIST = tomorrow and yesterday = the day that just ended.
+  const effectiveReferenceDate = new Date(referenceDate.getTime() + 10 * 60 * 1000);
+
+  const todayIST = getISTComponents(effectiveReferenceDate);
   const midnightInstant = getISTMidnightInstant(todayIST.dateString);
   // The calendar day that JUST ended -- this is what gets finalized as
   // present/absent below, now that it can no longer change.

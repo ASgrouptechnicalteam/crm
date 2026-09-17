@@ -88,6 +88,8 @@ export interface PerformanceScoreInputs {
   attendanceBoost: number;
   lateCount: number;
   halfDayCount: number;
+  manualAdjustmentsTotal: number;
+  manualAdjustmentsCount: number;
 }
 
 export interface PerformanceScoreBreakdown {
@@ -104,6 +106,8 @@ export interface PerformanceScoreBreakdown {
   latePenalty: number;
   halfDayCount: number;
   halfDayPenalty: number;
+  manualAdjustmentsTotal: number;
+  manualAdjustmentsCount: number;
   belowTargetEvents: number;
   belowTargetPenalty: number;
   targetExceededEvents: number;
@@ -144,6 +148,8 @@ const ZERO_BREAKDOWN: PerformanceScoreBreakdown = {
   latePenalty: 0,
   halfDayCount: 0,
   halfDayPenalty: 0,
+  manualAdjustmentsTotal: 0,
+  manualAdjustmentsCount: 0,
   belowTargetEvents: 0,
   belowTargetPenalty: 0,
   targetExceededEvents: 0,
@@ -204,6 +210,8 @@ export function calculatePerformanceScore(
     latePenalty: inputs.lateCount * PERFORMANCE_WEIGHTS.latePenalty,
     halfDayCount: inputs.halfDayCount,
     halfDayPenalty: inputs.halfDayCount * PERFORMANCE_WEIGHTS.halfDayPenalty,
+    manualAdjustmentsTotal: inputs.manualAdjustmentsTotal,
+    manualAdjustmentsCount: inputs.manualAdjustmentsCount,
     belowTargetEvents: inputs.belowTargetEvents,
     belowTargetPenalty: inputs.belowTargetEvents * PERFORMANCE_WEIGHTS.belowTargetPenalty,
     targetExceededEvents: inputs.targetExceededEvents,
@@ -250,7 +258,8 @@ export function calculatePerformanceScore(
   breakdown.tierBoostBonus = roundPerformanceScore(adjustedBoosts - totalBoosts);
   breakdown.tierPenaltyExtra = roundPerformanceScore(adjustedPenalties - totalPenalties);
 
-  const rawScore = PERFORMANCE_BASE_SCORE + adjustedBoosts - adjustedPenalties;
+  const rawScore =
+    PERFORMANCE_BASE_SCORE + adjustedBoosts - adjustedPenalties + breakdown.manualAdjustmentsTotal;
 
   return {
     score: roundPerformanceScore(rawScore),

@@ -17,12 +17,12 @@ jobManager.register({
   envDisableKey: 'DISABLE_JOB_STALE_LEADS',
 });
 
-// 3. Daily attendance rollup (Midnight, IST): force-checkout anyone still
+// 3. Daily attendance rollup (11:58 PM, IST): force-checkout anyone still
 // checked in and escalate a summary notification to HR (falling back to MD
 // if the company has no HR_MANAGER employee onboarded).
 jobManager.register({
   name: 'Daily Attendance Rollup',
-  schedule: '0 0 * * *',
+  schedule: '58 23 * * *',
   handler: tasks.dailyAttendanceRollupJob,
   envDisableKey: 'DISABLE_JOB_ATTENDANCE_ROLLUP',
 });

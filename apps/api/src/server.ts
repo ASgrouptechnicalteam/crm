@@ -26,6 +26,7 @@ import mdRoutes from './routes/md';
 import reportRoutes from './routes/reports';
 import taskRoutes from './routes/tasks';
 import performanceRoutes from './routes/performance';
+import performanceAdjustmentsRoutes from './routes/performanceAdjustments';
 import notificationRoutes from './routes/notifications';
 import targetRoutes from './routes/targets';
 import employeeRoutes from './routes/employees';
@@ -214,6 +215,7 @@ if (mountInternal) {
   app.use('/api/v1/reports', reportRoutes);
   app.use('/api/v1/tasks', taskRoutes);
   app.use('/api/v1/performance', performanceRoutes);
+  app.use('/api/v1/performance-adjustments', performanceAdjustmentsRoutes);
   app.use('/api/v1/notifications', notificationRoutes);
   app.use('/api/v1/targets', targetRoutes);
   app.use('/api/v1/employees', employeeRoutes);

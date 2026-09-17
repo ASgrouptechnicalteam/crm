@@ -26,6 +26,7 @@ const mapEmployeeToUser = (employee: any, roleNames: string[], permissions: stri
   roles: roleNames,
   permissions,
   attendanceRequired: employee.attendance_required,
+  reportRequired: employee.report_required !== false,
   firstLoginDone: employee.first_login_done,
   phone: employee.phone,
   secondaryPhone: employee.secondary_phone,

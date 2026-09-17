@@ -354,69 +354,74 @@ export const PropertyBrand = {
   RADHA_REAL_HOMES: 'RADHA_REAL_HOMES', // Commercial Plots & Land
 } as const;
 
-export const PropertyCreateSchema = z
-  .object({
-    title: z.string().min(3, 'Title is required'),
-    description: z.string().optional().nullable(),
-    brand_type: z.enum(['SONTHILLU', 'RADHA_REAL_HOMES']),
-    category: z.enum([
-      'APARTMENT',
-      'INDEPENDENT_HOUSE',
-      'DUPLEX',
-      'INDEPENDENT_FLOOR',
-      'VILLA',
-      'PENTHOUSE',
-      'STUDIO',
-      'PLOT',
-      'FARM_HOUSE',
-      'AGRICULTURAL_LAND',
-      // Were missing entirely — propertyWizardShared.tsx's PROPERTY_CATEGORIES
-      // has always listed these two, but the schema stripped them before they
-      // ever reached the service, so a Commercial Shop/Office could never
-      // actually be created.
-      'COMMERCIAL_SHOP',
-      'COMMERCIAL_OFFICE',
-    ]),
-    area_sqft: z.number().positive('Area in sqft is required'),
-    location: z.string().min(2, 'Location is required'),
-    address: z.string().optional(),
-    bedrooms: z.number().int().optional().nullable(),
-    bathrooms: z.number().int().optional().nullable(),
-    facing: z.string().optional(),
-    amenities: z.string().optional(),
-    possession_status: z.enum(['READY_TO_MOVE', 'UNDER_CONSTRUCTION']).optional(),
-    assigned_pm_id: z.number().int().optional().nullable(),
-    // Was missing entirely — validateRequestBody's schema.parse() strips any key not
-    // listed here, so a property could never actually be linked to a project via this
-    // endpoint despite property.service.ts's createProperty always reading data.project_id.
-    project_id: z.number().int().positive().optional().nullable(),
-    details: z.any().optional(), // kept for backward compatibility if needed temporarily
-    pricing: z.any().optional(),
-    // WR-2: Structured location fields
-    state: z.string().optional().nullable(),
-    city: z.string().optional().nullable(),
-    locality: z.string().optional().nullable(),
-    pincode: z.string().optional().nullable(),
-    latitude: z.number().optional().nullable(),
-    longitude: z.number().optional().nullable(),
-    listing_type: z.enum(['NEW', 'RESALE']).optional(),
-    source: z.enum(['INTERNAL', 'WEBSITE_SELLER']).optional(),
-    ...PropertyPricingFields,
-    ...CategoryDetailFields,
-  })
-  .superRefine((data, ctx) => {
-    // § Phase 3: base_rate is now the sole required pricing input — it replaced
-    // the removed manual `price` field as what actually drives final_price.
-    if (data.base_rate == null || data.base_rate <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['base_rate'],
-        message: 'Base rate is required and must be greater than 0',
-      });
-    }
-  });
+const BasePropertyCreateSchema = z.object({
+  status: z.string().optional(),
+  title: z.string().min(3, 'Title is required'),
+  description: z.string().optional().nullable(),
+  brand_type: z.enum(['SONTHILLU', 'RADHA_REAL_HOMES']),
+  category: z.enum([
+    'APARTMENT',
+    'INDEPENDENT_HOUSE',
+    'DUPLEX',
+    'INDEPENDENT_FLOOR',
+    'VILLA',
+    'PENTHOUSE',
+    'STUDIO',
+    'PLOT',
+    'FARM_HOUSE',
+    'AGRICULTURAL_LAND',
+    // Were missing entirely — propertyWizardShared.tsx's PROPERTY_CATEGORIES
+    // has always listed these two, but the schema stripped them before they
+    // ever reached the service, so a Commercial Shop/Office could never
+    // actually be created.
+    'COMMERCIAL_SHOP',
+    'COMMERCIAL_OFFICE',
+  ]),
+  area_sqft: z.number().positive('Area in sqft is required'),
+  location: z.string().min(2, 'Location is required'),
+  address: z.string().optional(),
+  bedrooms: z.number().int().optional().nullable(),
+  bathrooms: z.number().int().optional().nullable(),
+  facing: z.string().optional(),
+  amenities: z.string().optional(),
+  possession_status: z.enum(['READY_TO_MOVE', 'UNDER_CONSTRUCTION']).optional(),
+  assigned_pm_id: z.number().int().optional().nullable(),
+  // Was missing entirely — validateRequestBody's schema.parse() strips any key not
+  // listed here, so a property could never actually be linked to a project via this
+  // endpoint despite property.service.ts's createProperty always reading data.project_id.
+  project_id: z.number().int().positive().optional().nullable(),
+  details: z.any().optional(), // kept for backward compatibility if needed temporarily
+  pricing: z.any().optional(),
+  // WR-2: Structured location fields
+  state: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  locality: z.string().optional().nullable(),
+  pincode: z.string().optional().nullable(),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+  listing_type: z.enum(['NEW', 'RESALE']).optional(),
+  source: z.enum(['INTERNAL', 'WEBSITE_SELLER']).optional(),
+  ...PropertyPricingFields,
+  ...CategoryDetailFields,
+});
+
+export const PropertyCreateSchema = BasePropertyCreateSchema.superRefine((data, ctx) => {
+  // § Phase 3: base_rate is now the sole required pricing input — it replaced
+  // the removed manual `price` field as what actually drives final_price.
+  if (data.base_rate == null || data.base_rate <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['base_rate'],
+      message: 'Base rate is required and must be greater than 0',
+    });
+  }
+});
 
 export type PropertyCreateInput = z.infer<typeof PropertyCreateSchema>;
+
+// A fully relaxed version of PropertyCreateSchema for saving incomplete drafts
+export const PropertyDraftSchema = BasePropertyCreateSchema.partial();
+export type PropertyDraftInput = z.infer<typeof PropertyDraftSchema>;
 
 export const PropertyVerificationSchema = z.object({
   approved: z.boolean(),
@@ -459,6 +464,7 @@ export type PropertyResubmitInput = z.infer<typeof PropertyResubmitSchema>;
 export type PropertyMDApprovalInput = z.infer<typeof PropertyMDApprovalSchema>;
 
 export const PropertyUpdateSchema = z.object({
+  status: z.string().optional(),
   title: z.string().min(3).optional(),
   // .nullable(): PropertyForm.tsx (Rebuild Phase 5) always sends the full
   // fetched property back on submit (like ProjectWizard.tsx does for

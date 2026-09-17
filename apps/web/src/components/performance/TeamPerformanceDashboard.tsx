@@ -40,6 +40,10 @@ interface EmployeeScore {
     uninformedAbsent: number;
     propertyBookingContributions: number;
     targetExceededEvents?: number;
+    midnightAutoCheckoutEvents?: number;
+    missingDailyReportEvents?: number;
+    manualAdjustmentsTotal?: number;
+    manualAdjustmentsCount?: number;
   };
 }
 
@@ -522,9 +526,30 @@ export const TeamPerformanceDashboard: React.FC = () => {
                         color: 'text-red-800',
                         hint: '-2.0 each',
                       },
-                    ].map((item) => (
+                      {
+                        label: 'Midnight Checkouts',
+                        value: `-${emp.breakdown.midnightAutoCheckoutEvents || 0}`,
+                        color: 'text-red-900',
+                        hint: '-1.0 each',
+                      },
+                      {
+                        label: 'Missing Daily Reports',
+                        value: `-${emp.breakdown.missingDailyReportEvents || 0}`,
+                        color: 'text-rose-900',
+                        hint: '-1.0 each',
+                      },
+                      {
+                        label: 'HR/MD Adjustments',
+                        value: `${(emp.breakdown.manualAdjustmentsTotal || 0) >= 0 ? '+' : ''}${emp.breakdown.manualAdjustmentsTotal || 0}`,
+                        color:
+                          (emp.breakdown.manualAdjustmentsTotal || 0) >= 0
+                            ? 'text-emerald-700'
+                            : 'text-red-700',
+                        hint: `${emp.breakdown.manualAdjustmentsCount || 0} times`,
+                      },
+                    ].map((item, i) => (
                       <div
-                        key={item.label}
+                        key={i}
                         className="bg-white rounded-xl p-2.5 border border-white/60 shadow-sm"
                       >
                         <span className="text-[9px] text-slate-500 block">{item.label}</span>
@@ -538,7 +563,7 @@ export const TeamPerformanceDashboard: React.FC = () => {
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-[10px] text-slate-400">Base Score: +50.0</span>
                     <span className={`text-sm font-extrabold font-mono ${cfg.text}`}>
-                      Final Score: {emp.score} pts
+                      Final: {emp.score}
                     </span>
                   </div>
                 </div>

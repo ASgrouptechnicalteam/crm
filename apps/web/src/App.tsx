@@ -177,6 +177,11 @@ const TeamPerformanceDashboard = lazy(() =>
     default: m.TeamPerformanceDashboard,
   })),
 );
+const PerformanceAdjustmentPage = lazy(() =>
+  import('./components/performance/PerformanceAdjustmentPage').then((m) => ({
+    default: m.default,
+  })),
+);
 const AnalyticsHub = lazy(() =>
   import('./components/analytics/AnalyticsHub').then((m) => ({ default: m.AnalyticsHub })),
 );
@@ -277,13 +282,15 @@ const AppShell: React.FC = () => {
   }, [accessToken]);
 
   // Report Exemption Logic (for logout gate only — attendance gating removed)
-  const isExemptFromReport = user?.roles?.some(
-    (r) =>
-      r === Roles.MD ||
-      r === Roles.HR_MANAGER ||
-      r === Roles.ADMIN ||
-      r === Roles.MARKETING_DIRECTOR,
-  );
+  const isExemptFromReport =
+    user?.reportRequired === false ||
+    user?.roles?.some(
+      (r) =>
+        r === Roles.MD ||
+        r === Roles.HR_MANAGER ||
+        r === Roles.ADMIN ||
+        r === Roles.MARKETING_DIRECTOR,
+    );
 
   const [showLogoutIntentModal, setShowLogoutIntentModal] = useState(false);
 
@@ -637,6 +644,10 @@ const AppShell: React.FC = () => {
         element={
           canViewTeamPerformance ? <TeamPerformanceDashboard /> : <Navigate to="/" replace />
         }
+      />
+      <Route
+        path="/performance-adjustments"
+        element={canManageEmployees ? <PerformanceAdjustmentPage /> : <Navigate to="/" replace />}
       />
       <Route
         path="/customer-feedback"

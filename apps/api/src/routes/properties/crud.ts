@@ -4,6 +4,7 @@ import { authenticateToken, AuthenticatedRequest } from '../../middleware/auth';
 import { requireAuthz } from '../../middleware/authz';
 import {
   PropertyCreateSchema,
+  PropertyDraftSchema,
   PropertyUpdateSchema,
   PropertyReassignSchema,
   Permissions,
@@ -98,12 +99,20 @@ router.post(
   '/',
   authenticateToken,
   requireAuthz(Permissions.PROPERTIES_CREATE),
-  validateRequestBody(PropertyCreateSchema),
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (req.body.status === 'DRAFT') {
+      return validateRequestBody(PropertyDraftSchema)(req, res, next);
+    }
+    return validateRequestBody(PropertyCreateSchema)(req, res, next);
+  },
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const property = await PropertyService.createProperty(req.user!, req.body);
       return res.status(201).json({
-        message: 'Property listing created and submitted for PM On-Site Verification',
+        message:
+          req.body.status === 'DRAFT'
+            ? 'Draft saved successfully'
+            : 'Property listing created and submitted for PM On-Site Verification',
         property,
       });
     } catch (error: any) {

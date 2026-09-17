@@ -77,32 +77,39 @@ async function computeMonthScore(
       updated_at: { gte: startOfMonth, lte: endOfMonth },
     },
   });
+
+  // The dailyAttendanceRollupJob cron runs at 05:30 AM IST (Midnight UTC) on the morning *after*
+  // the day it evaluates. To correctly group these overnight events into the calendar month they
+  // actually belong to (e.g. August 31st's absence runs on Sept 1st 05:30), we shift the bounds by 6 hours.
+  const cronStart = new Date(startOfMonth.getTime() + 6 * 60 * 60 * 1000);
+  const cronEnd = new Date(endOfMonth.getTime() + 6 * 60 * 60 * 1000);
+
   const uninformedAbsentEvents = await p.auditEvent.count({
     where: {
       actor_id: employeeId,
       action: 'UNINFORMED_ABSENT',
-      created_at: { gte: startOfMonth, lte: endOfMonth },
+      created_at: { gte: cronStart, lte: cronEnd },
     },
   });
   const midnightAutoCheckoutEvents = await p.auditEvent.count({
     where: {
       actor_id: employeeId,
       action: 'ATTENDANCE_AUTO_CHECKOUT_MIDNIGHT',
-      created_at: { gte: startOfMonth, lte: endOfMonth },
+      created_at: { gte: cronStart, lte: cronEnd },
     },
   });
   const missingDailyReportEvents = await p.auditEvent.count({
     where: {
       actor_id: employeeId,
       action: 'MISSING_DAILY_REPORT',
-      created_at: { gte: startOfMonth, lte: endOfMonth },
+      created_at: { gte: cronStart, lte: cronEnd },
     },
   });
   const completedAllWorkEvents = await p.auditEvent.count({
     where: {
       actor_id: employeeId,
       action: 'COMPLETED_ALL_WORK',
-      created_at: { gte: startOfMonth, lte: endOfMonth },
+      created_at: { gte: cronStart, lte: cronEnd },
     },
   });
   const propertyBookingContributions = await p.auditEvent.count({
@@ -112,6 +119,15 @@ async function computeMonthScore(
       created_at: { gte: startOfMonth, lte: endOfMonth },
     },
   });
+
+  const manualAdjustments = await p.performanceAdjustment.findMany({
+    where: {
+      employee_id: employeeId,
+      created_at: { gte: startOfMonth, lte: endOfMonth },
+    },
+  });
+  const manualAdjustmentsTotal = manualAdjustments.reduce((sum, adj) => sum + adj.points, 0);
+  const manualAdjustmentsCount = manualAdjustments.length;
 
   const attendanceLogs = await p.attendanceLog.findMany({
     where: { employee_id: employeeId, check_in_at: { gte: startOfMonth, lte: endOfMonth } },
@@ -151,6 +167,8 @@ async function computeMonthScore(
       attendanceBoost,
       lateCount,
       halfDayCount,
+      manualAdjustmentsTotal,
+      manualAdjustmentsCount,
     },
     tierBasisScore,
   );
@@ -194,6 +212,8 @@ router.get('/history', authenticateToken, async (req: AuthenticatedRequest, res:
     const year = req.query.year ? Number(req.query.year) : istYear;
     const month = req.query.month ? Number(req.query.month) : istMonth;
     const { startOfMonth, endOfMonth } = getISTMonthRange(year, month);
+    const cronStart = new Date(startOfMonth.getTime() + 6 * 60 * 60 * 1000);
+    const cronEnd = new Date(endOfMonth.getTime() + 6 * 60 * 60 * 1000);
     const events: any[] = [];
 
     events.push({
@@ -266,7 +286,33 @@ router.get('/history', authenticateToken, async (req: AuthenticatedRequest, res:
     }
 
     const auditEvents = await p.auditEvent.findMany({
-      where: { actor_id: employeeId, created_at: { gte: startOfMonth, lte: endOfMonth } },
+      where: {
+        actor_id: employeeId,
+        OR: [
+          {
+            action: {
+              in: [
+                'UNINFORMED_ABSENT',
+                'ATTENDANCE_AUTO_CHECKOUT_MIDNIGHT',
+                'MISSING_DAILY_REPORT',
+                'COMPLETED_ALL_WORK',
+              ],
+            },
+            created_at: { gte: cronStart, lte: cronEnd },
+          },
+          {
+            action: {
+              notIn: [
+                'UNINFORMED_ABSENT',
+                'ATTENDANCE_AUTO_CHECKOUT_MIDNIGHT',
+                'MISSING_DAILY_REPORT',
+                'COMPLETED_ALL_WORK',
+              ],
+            },
+            created_at: { gte: startOfMonth, lte: endOfMonth },
+          },
+        ],
+      },
       orderBy: { created_at: 'desc' },
     });
     for (const b of auditEvents) {
@@ -385,6 +431,26 @@ router.get('/history', authenticateToken, async (req: AuthenticatedRequest, res:
       }
     }
 
+    const manualAdjustments = await p.performanceAdjustment.findMany({
+      where: {
+        employee_id: employeeId,
+        created_at: { gte: startOfMonth, lte: endOfMonth },
+      },
+      include: { adjuster: { select: { full_name: true, employee_code: true } } },
+    });
+
+    for (const adj of manualAdjustments) {
+      events.push({
+        id: `manual-adj-${adj.id}`,
+        action: 'MANUAL_SCORE_ADJUSTMENT',
+        title: 'Manual Score Adjustment',
+        points: adj.points,
+        type: adj.points > 0 ? 'BOOST' : 'PENALTY',
+        description: `${adj.reason} (by ${adj.adjuster.full_name || adj.adjuster.employee_code})`,
+        timestamp: adj.created_at,
+      });
+    }
+
     events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return res.status(200).json({ events });
@@ -423,7 +489,13 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
     const [istYear, istMonth] = getISTComponents().dateString.split('-').map(Number);
     const year = req.query.year ? Number(req.query.year) : istYear;
     const month = req.query.month ? Number(req.query.month) : istMonth;
-    const { startOfMonth, endOfMonth } = getISTMonthRange(year, month);
+    const { startOfMonth, endOfMonth } = getISTMonthRange(Number(year), Number(month));
+
+    // The dailyAttendanceRollupJob cron runs at 05:30 AM IST (Midnight UTC) on the morning *after*
+    // the day it evaluates. To correctly group these overnight events into the calendar month they
+    // actually belong to (e.g. August 31st's absence runs on Sept 1st 05:30), we shift the bounds by 6 hours.
+    const cronStart = new Date(startOfMonth.getTime() + 6 * 60 * 60 * 1000);
+    const cronEnd = new Date(endOfMonth.getTime() + 6 * 60 * 60 * 1000);
 
     const employees = await p.employee.findMany({
       where: whereClause,
@@ -486,28 +558,28 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
             where: {
               actor_id: emp.id,
               action: 'UNINFORMED_ABSENT',
-              created_at: { gte: startOfMonth, lte: endOfMonth },
+              created_at: { gte: cronStart, lte: cronEnd },
             },
           }),
           p.auditEvent.count({
             where: {
               actor_id: emp.id,
               action: 'ATTENDANCE_AUTO_CHECKOUT_MIDNIGHT',
-              created_at: { gte: startOfMonth, lte: endOfMonth },
+              created_at: { gte: cronStart, lte: cronEnd },
             },
           }),
           p.auditEvent.count({
             where: {
               actor_id: emp.id,
               action: 'MISSING_DAILY_REPORT',
-              created_at: { gte: startOfMonth, lte: endOfMonth },
+              created_at: { gte: cronStart, lte: cronEnd },
             },
           }),
           p.auditEvent.count({
             where: {
               actor_id: emp.id,
               action: 'COMPLETED_ALL_WORK',
-              created_at: { gte: startOfMonth, lte: endOfMonth },
+              created_at: { gte: cronStart, lte: cronEnd },
             },
           }),
           p.auditEvent.count({
@@ -539,6 +611,15 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
           }
         }
 
+        const manualAdjustments = await p.performanceAdjustment.findMany({
+          where: {
+            employee_id: emp.id,
+            created_at: { gte: startOfMonth, lte: endOfMonth },
+          },
+        });
+        const manualAdjustmentsTotal = manualAdjustments.reduce((sum, adj) => sum + adj.points, 0);
+        const manualAdjustmentsCount = manualAdjustments.length;
+
         const { score, breakdown } = calculatePerformanceScore({
           completedTasks: tasksDone,
           overdueTasks: tasksOverdue,
@@ -554,6 +635,8 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
           attendanceBoost,
           lateCount,
           halfDayCount,
+          manualAdjustmentsTotal,
+          manualAdjustmentsCount,
         });
 
         return {
@@ -576,6 +659,8 @@ router.get('/team', authenticateToken, async (req: AuthenticatedRequest, res: Re
             midnightAutoCheckoutEvents: midnightAutoCheckout,
             missingDailyReportEvents: missingDailyReport,
             propertyBookingContributions,
+            manualAdjustmentsTotal,
+            manualAdjustmentsCount,
           },
           zone:
             score >= 86

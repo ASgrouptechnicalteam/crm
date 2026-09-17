@@ -368,6 +368,12 @@ export class AnalyticsService {
           }
         }
 
+        const manualAdjustments = await p.performanceAdjustment.findMany({
+          where: { employee_id: emp.id },
+        });
+        const manualAdjustmentsTotal = manualAdjustments.reduce((sum, adj) => sum + adj.points, 0);
+        const manualAdjustmentsCount = manualAdjustments.length;
+
         return calculatePerformanceScore({
           completedTasks: tasksDone,
           overdueTasks: tasksOverdue,
@@ -383,6 +389,8 @@ export class AnalyticsService {
           attendanceBoost,
           lateCount,
           halfDayCount,
+          manualAdjustmentsTotal,
+          manualAdjustmentsCount,
         }).score;
       }),
     );

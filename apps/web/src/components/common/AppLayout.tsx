@@ -344,6 +344,13 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     ],
   },
   {
+    id: 'performance-adjustments',
+    label: 'Score Adjustments',
+    icon: Settings2,
+    path: '/performance-adjustments',
+    requiredAnyRole: [Roles.MD, Roles.ADMIN, Roles.HR_MANAGER],
+  },
+  {
     id: 'customer-feedback',
     label: 'Customer Feedback',
     icon: MessageSquareText,
