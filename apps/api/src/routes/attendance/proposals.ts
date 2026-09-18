@@ -353,11 +353,42 @@ router.post(
             }
           }
         }
+      } else if (updated.type === 'FIELD_WORK') {
+        const targetDate = new Date(updated.target_date);
+        const { dateString } = getISTComponents(targetDate);
+        const istTodayStart = new Date(`${dateString}T00:00:00+05:30`);
+        const istTodayEnd = new Date(`${dateString}T23:59:59+05:30`);
+
+        const existingLog = await p.attendanceLog.findFirst({
+          where: {
+            employee_id: updated.employee_id,
+            check_in_at: { gte: istTodayStart, lte: istTodayEnd },
+          },
+        });
+
+        if (!existingLog) {
+          const checkIn = new Date(`${dateString}T09:30:00+05:30`);
+          const checkOut = new Date(`${dateString}T18:30:00+05:30`);
+          await p.attendanceLog.create({
+            data: {
+              employee_id: updated.employee_id,
+              check_in_at: checkIn,
+              check_out_at: checkOut,
+              working_duration_minutes: 540,
+              status: 'PRESENT',
+            },
+          });
+        } else if (existingLog.status !== 'PRESENT') {
+          await p.attendanceLog.update({
+            where: { id: existingLog.id },
+            data: { status: 'PRESENT' },
+          });
+        }
       }
 
       notifyEmployee(proposal.employee_id, {
         title: 'Proposal Approved',
-        message: `Your ${proposal.type === 'LEAVE' ? 'leave' : 'late'} request for ${new Date(proposal.target_date).toLocaleDateString()} has been approved.`,
+        message: `Your ${proposal.type === 'LEAVE' ? 'leave' : proposal.type === 'FIELD_WORK' ? 'field work' : 'late'} request for ${new Date(proposal.target_date).toLocaleDateString()} has been approved.`,
         type: 'SYSTEM',
         link: '/attendance',
       });
@@ -391,9 +422,42 @@ router.post(
         },
       });
 
+      if (updated.type === 'FIELD_WORK') {
+        const targetDate = new Date(updated.target_date);
+        const { dateString } = getISTComponents(targetDate);
+        const istTodayStart = new Date(`${dateString}T00:00:00+05:30`);
+        const istTodayEnd = new Date(`${dateString}T23:59:59+05:30`);
+
+        const existingLog = await p.attendanceLog.findFirst({
+          where: {
+            employee_id: updated.employee_id,
+            check_in_at: { gte: istTodayStart, lte: istTodayEnd },
+          },
+        });
+
+        if (!existingLog) {
+          const checkIn = new Date(`${dateString}T09:30:00+05:30`);
+          const checkOut = new Date(`${dateString}T18:30:00+05:30`);
+          await p.attendanceLog.create({
+            data: {
+              employee_id: updated.employee_id,
+              check_in_at: checkIn,
+              check_out_at: checkOut,
+              working_duration_minutes: 0,
+              status: 'ABSENT',
+            },
+          });
+        } else if (existingLog.status !== 'ABSENT') {
+          await p.attendanceLog.update({
+            where: { id: existingLog.id },
+            data: { status: 'ABSENT' },
+          });
+        }
+      }
+
       notifyEmployee(proposal.employee_id, {
         title: 'Proposal Rejected',
-        message: `Your ${proposal.type === 'LEAVE' ? 'leave' : 'late'} request for ${new Date(proposal.target_date).toLocaleDateString()} has been rejected.`,
+        message: `Your ${proposal.type === 'LEAVE' ? 'leave' : proposal.type === 'FIELD_WORK' ? 'field work' : 'late'} request for ${new Date(proposal.target_date).toLocaleDateString()} has been rejected.`,
         type: 'SYSTEM',
         link: '/attendance',
       });

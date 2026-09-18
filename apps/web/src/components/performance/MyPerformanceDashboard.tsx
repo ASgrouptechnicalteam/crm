@@ -339,8 +339,13 @@ export const MyPerformanceDashboard: React.FC = () => {
                     <span className="font-bold text-emerald-600">+0.5</span>
                   </li>
                   <li className="flex justify-between items-center bg-emerald-50/50 p-2 rounded-lg border border-emerald-100/50">
-                    <span>Daily Check-in (Present)</span>
-                    <span className="font-bold text-emerald-600">+0.5</span>
+                    <span className="flex flex-col">
+                      <span>Daily Check-in (Time-based gradient)</span>
+                      <span className="text-[10px] text-emerald-600/70">
+                        Early = max points, later = fewer points
+                      </span>
+                    </span>
+                    <span className="font-bold text-emerald-600">up to +1.0</span>
                   </li>
                   <li className="flex justify-between items-center bg-emerald-50/50 p-2 rounded-lg border border-emerald-100/50">
                     <span>Property Booked (All Contributors)</span>
@@ -390,12 +395,26 @@ export const MyPerformanceDashboard: React.FC = () => {
                 </ul>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <p className="text-xs text-slate-500">
-                <strong>Note:</strong> Your base score is reset to <strong>50.0</strong> at the
-                start of every month. The maximum possible score is uncapped, but negative scores
-                will flag a Danger Zone rating.
+            <div className="mt-6 pt-4 border-t border-slate-100 bg-slate-50/50 -mx-6 px-6 pb-2 rounded-b-2xl">
+              <p className="text-xs text-slate-600 mb-2">
+                <strong>Base Score & Outcome Multipliers:</strong> Your base score is reset to{' '}
+                <strong>50.0</strong> at the start of every month. The maximum possible score is
+                uncapped. Multipliers apply based on your tier:
               </p>
+              <ul className="text-xs text-slate-500 list-disc list-inside space-y-1">
+                <li>
+                  <strong className="text-emerald-700">EXCELLENT (85+):</strong> Boosts earn 1.1x
+                  points.
+                </li>
+                <li>
+                  <strong className="text-navy-700">SAFE (65-85) & SATISFACTORY (40-65):</strong>{' '}
+                  Standard 1.0x baseline.
+                </li>
+                <li>
+                  <strong className="text-rose-700">DANGER (≤40):</strong> Penalties deduct 1.25x
+                  points.
+                </li>
+              </ul>
             </div>
           </div>
         )}

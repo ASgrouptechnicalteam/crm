@@ -94,6 +94,16 @@ jobManager.register({
   envDisableKey: 'DISABLE_JOB_INVENTORY_EXPIRY',
 });
 
+import { siteVisitReconfirmReminderJob } from './visitReminders';
+
+// 12. T-1 Site Visit Reconfirmation Reminder (Daily at 9:00 AM)
+jobManager.register({
+  name: 'T-1 Site Visit Reminder',
+  schedule: '0 9 * * *',
+  handler: siteVisitReconfirmReminderJob,
+  envDisableKey: 'DISABLE_JOB_VISIT_REMINDERS',
+});
+
 export const initJobs = () => {
   jobManager.startAll();
 };

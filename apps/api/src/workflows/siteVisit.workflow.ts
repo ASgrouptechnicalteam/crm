@@ -48,28 +48,35 @@ export type SiteVisitAction =
 
 export class SiteVisitWorkflow implements DomainWorkflow {
   // Only REAL transitions are listed; any action not present is invalid.
-  private static readonly validTransitions: Partial<Record<string, Partial<Record<SiteVisitAction, string>>>> = {
+  private static readonly validTransitions: Partial<
+    Record<string, Partial<Record<SiteVisitAction, string>>>
+  > = {
     REQUESTED: {
       ROUTE: 'PENDING_ACCEPTANCE',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     PENDING_ACCEPTANCE: {
       ACCEPT: 'ACCEPTED',
       REASSIGN: 'REASSIGNED',
       ESCALATE: 'ESCALATED_TO_MARKETING_DIRECTOR',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     REASSIGNED: {
       ROUTE: 'PENDING_ACCEPTANCE',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     ESCALATED_TO_MARKETING_DIRECTOR: {
       ROUTE: 'PENDING_ACCEPTANCE',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     ACCEPTED: {
       RECONFIRM_CUSTOMER: 'PENDING_CUSTOMER_RECONFIRMATION',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     PENDING_CUSTOMER_RECONFIRMATION: {
       HOLD: 'ON_HOLD',
@@ -99,10 +106,12 @@ export class SiteVisitWorkflow implements DomainWorkflow {
     CONFIRMED: {
       START: 'ACTIVE',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     ACTIVE: {
       COMPLETE: 'COMPLETED',
       CANCEL: 'CANCELLED',
+      RESCHEDULE: 'RESCHEDULE_REQUESTED',
     },
     COMPLETED: {},
     CANCELLED: {},
@@ -137,7 +146,10 @@ export class SiteVisitWorkflow implements DomainWorkflow {
   static validateTransition(currentStatus: string, action: SiteVisitAction): void {
     const allowedMap = this.validTransitions[currentStatus];
     if (!allowedMap || !allowedMap[action]) {
-      throw { status: 409, message: `Invalid workflow transition: Cannot perform ${action} from state ${currentStatus}` };
+      throw {
+        status: 409,
+        message: `Invalid workflow transition: Cannot perform ${action} from state ${currentStatus}`,
+      };
     }
   }
 }

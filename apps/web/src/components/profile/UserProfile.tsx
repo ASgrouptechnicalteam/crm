@@ -24,14 +24,25 @@ import { API_BASE_URL } from '../../config';
 import { mediaUrl } from '../../utils/imageUtils';
 import { EmergencyLogoutModal } from './EmergencyLogoutModal';
 
+import { Roles } from '../../shared';
+
 const roleCopy: Record<string, string> = {
-  ADMIN: 'Full system access, configuration, and oversight.',
-  TELECALLER: 'Manage outbound calls, qualify leads, and schedule site visits.',
-  PROJECT_MANAGER: 'Oversee site visits, manage inventory, and handle approvals.',
-  SALES_MANAGER: 'Drive sales performance, review metrics, and approve discounts.',
-  AGENT: 'Conduct site visits, follow up with clients, and close deals.',
-  FRONT_OFFICE: 'Manage physical walk-ins, assign tokens, and welcome visitors.',
-  CASHIER: 'Process payments, generate receipts, and reconcile collections.',
+  [Roles.ADMIN]: 'Full system access, configuration, and oversight.',
+  [Roles.TELECALLER]: 'Manage outbound calls, qualify leads, and schedule site visits.',
+  [Roles.PROJECT_MANAGER]: 'Oversee site visits, manage inventory, and handle approvals.',
+  [Roles.SALES_MANAGER]: 'Drive sales performance, review metrics, and approve discounts.',
+  [Roles.AGENT]: 'Conduct site visits, follow up with clients, and close deals.',
+  [Roles.MD]: 'Executive oversight, strategic approvals, and company-wide visibility.',
+  [Roles.HR_MANAGER]: 'Manage employee lifecycle, attendance, payroll, and company policies.',
+  [Roles.MARKETING_DIRECTOR]:
+    'Oversee marketing campaigns, manage budgets, and analyze lead generation.',
+  [Roles.FINANCE]: 'Process payments, generate receipts, and reconcile collections.',
+  [Roles.CHANNEL_PARTNER_MANAGER]:
+    'Manage channel partners, track their leads, and process commissions.',
+  [Roles.DIGITAL_MARKETING_HEAD]: 'Lead digital marketing strategy and campaigns.',
+  [Roles.DIGITAL_MARKETING_EXECUTIVE]: 'Execute digital marketing campaigns and SEO/SEM.',
+  [Roles.DIGITAL_LEAD_OPERATOR]: 'Operate and distribute leads from digital channels.',
+  [Roles.STAFF]: 'Standard employee access.',
 };
 
 export const UserProfile: React.FC = () => {

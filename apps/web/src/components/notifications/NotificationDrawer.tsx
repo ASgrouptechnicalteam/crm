@@ -234,7 +234,7 @@ export const NotificationDrawer: React.FC = () => {
               </div>
 
               {/* Notification List */}
-              <div className="max-h-[420px] overflow-y-auto">
+              <div className="flex-1 overflow-y-auto max-h-[min(70vh,640px)]">
                 {notifications.length === 0 ? (
                   <div className="py-12 text-center">
                     <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">

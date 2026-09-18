@@ -1,274 +1,266 @@
-## A. Critical FE ↔ BE (still broken)
-
-### A1. Site visit accept still fails for Agent (incomplete Wave 6)
-
-**Problem**
-
-- Route requires `SITE_VISITS_ACCEPT`.
-- `lifecycle.acceptVisit` and `SiteVisitPolicy.canAccept` still check `SITE_VISITS_ASSIGN_AGENT`.
-- Agent matrix has ACCEPT, not ASSIGN → route may pass, service returns 403.
-
-**Instructions**
-
-1. In `apps/api/src/services/siteVisit/lifecycle.ts` → accept uses `Permissions.SITE_VISITS_ACCEPT`.
-2. In `apps/api/src/policies/siteVisit.policy.ts` → `canAccept` uses `SITE_VISITS_ACCEPT`.
-3. Keep ASSIGN only on assign/reassign routes.
-4. Add `SITE_VISITS_ACCEPT` to `apps/web/src/shared` (constant + Agent/PM/SM matrix).
-5. After deploy, restart API once so brand-new permission is seeded onto existing roles.
-
-### A2. Agent cannot reach Accept UI
-
-**Problem**  
-Accept only lives in `PMBlindApprovalQueue`, nav `pm-approvals` is `PROJECT_MANAGER | MD | ADMIN` only. Agent never sees Accept even after API fix.
-
-**Instructions**
-
-- Show approvals / pending-accept queue for any role with `SITE_VISITS_ACCEPT` (or include Agent).
-- List visits where `project_manager_id === current user` and status `PENDING_ACCEPTANCE`.
-- Update outdated comment “agents cannot accept”.
-
-### A3. Reassign target list excludes Agents
-
-**Problem**  
-Policy allows Agent as reassignment target; UI filters only PM/SM → cannot assign to Agent.
-
-**Instructions**  
-In reassign dropdown, include employees with `PROJECT_MANAGER` **or** `AGENT`.
+**Telecaller site-visit product rule (your wording) vs current app**
 
 ---
 
-## B. Permissions & navigation (your items 3–4)
+## What you want
 
-### B1. Sidebar not fully permission-driven
-
-**Problem**  
-Many items always visible (Leads, Site Visits, Demos, Tasks, Properties, Projects, Complaints, etc.) with only some using `requiredAnyRole`. Little use of `requiredPermission`. Users see pages they cannot use → 403 / empty screens.
-
-**Instructions**
-
-1. Every nav item that hits a guarded API must set `requiredPermission` (and/or `requiredAnyRole` where role is the product rule).
-2. Filter: show only if `(permission match) AND (role match if set)`.
-3. Examples:
-   - Leads → `LEADS_READ`
-   - Site Visits → `SITE_VISITS_READ`
-   - Demos → `DEMOS_READ`
-   - Tasks → `TASKS_READ`
-   - Properties → `PROPERTIES_READ`
-   - Projects → `PROJECTS_READ`
-   - Bookings → `BOOKINGS_READ`
-   - PM Approvals → `SITE_VISITS_ACCEPT` or `DEMOS_ACCEPT`
-   - Bulk-related only where `LEADS_BULK_UPLOAD`
-4. Same rule for mobile bottom nav and any “quick actions”.
-5. **Never** show a button that only fails with “Access denied”; hide or disable with no dead click.
-
-### B2. Web shared still missing `SITE_VISITS_ACCEPT`
-
-**Instructions**  
-Mirror API/`packages/shared` into `apps/web/src/shared` so FE gates match BE.
-
-### B3. Role vs permission mismatches (examples)
-
-| Screen                 | Risk                                                                |
-| ---------------------- | ------------------------------------------------------------------- |
-| Bulk upload            | Mostly fixed; still role OR for MD/MD-like — prefer permission only |
-| Task assignee dropdown | Needs `EMPLOYEES_READ`; empty without it                            |
-| Lead assign            | Uses `/md/employees` vs elsewhere `/employees`                      |
-
-**Instructions**  
-One employee-list endpoint + require `EMPLOYEES_READ` only where assign is allowed; hide assign UI without it.
+1. **As soon as a site visit is booked** → telecaller sees it on the **Site Visits** page.
+2. **Full details**, including **which PM accepted** (when accepted).
+3. Actions: **Reschedule** and **Cancel**, available **until the visit is completed**.
+4. After **Completed** → visit appears under a **Completed** tab (not mixed as the main active work list).
+5. **1 day before** → **notification only** to reconfirm (not the first time actions appear).
 
 ---
 
-## C. Lead distribution (your item 1)
+## What the app does today
 
-### C1. Leads are **not** equally distributed
-
-**Problem**  
-`distributionService` uses **performance-weighted** assignment: score + call boost + new-joiner boost − active load. Not round-robin / equal share.
-
-**Instructions (product choice → code)**  
-If product rule is **equal distribution to all active telecallers**:
-
-1. Replace (or add mode) equal / round-robin among `ACTIVE` telecallers.
-2. Prefer lowest `activeLeadCount` (true load balance), optional stable rotation (last assigned id).
-3. Remove or disable performance weight for assignment (keep score for dashboards only).
-4. Unclaimed only when **zero** active telecallers.
-5. Document in distribution monitor: “Equal load balancing”, not “performance weighted”.
-6. Add test: N telecallers, N×K leads → counts differ by at most 1.
+| Requirement                      | Current state                                                                                                                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Show booked visits to telecaller | Partially: list is scoped to telecaller / PM / agent; **booked** visits in `PENDING_ACCEPTANCE` can appear for the booking telecaller.                                                                                                                                    |
+| Full details + PM who accepted   | Partially: card can show `telecaller` and `project_manager` when present. **`project_manager` is set on accept** — before accept, PM may be route target only / incomplete on card.                                                                                       |
+| Reschedule from booking onward   | **No.** Reschedule mainly when `ACCEPTED` or `PENDING_CUSTOMER_RECONFIRMATION` (+ `SITE_VISITS_VERIFY`). **Not** on `PENDING_ACCEPTANCE`.                                                                                                                                 |
+| Cancel until completed           | **No.** Cancel/initiate-cancel is tied to later states (e.g. hold / reconfirm paths), not all open statuses from book → complete.                                                                                                                                         |
+| Completed tab                    | **No dedicated “Active / Completed” tabs.** There is a **status stepper** including “6. Done”; all visits share one grid filtered by pipeline stages, not a clear Completed tab.                                                                                          |
+| T−1 reconfirm **notification**   | **Weak.** Dashboard pushes **“Reconfirm Tomorrow's Visits”** (UI banner for tomorrow only). Not the same as a reliable **push/in-app notification job** 1 day before. Reconfirm **action** is still status-gated (`ACCEPTED` → reconfirm flow), not “notify only at T−1.” |
 
 ---
 
-## D. Global search (your item 2)
+## Gaps to fix (clear instructions)
 
-### D1. Global search bar should be removed
-
-**Problem**  
-`GlobalSearchInput` in `AppLayout` is a non-functional placeholder (`<input type="search">` with no handler/API).
+### 1. Telecaller Site Visits list: always show _their_ open bookings
 
 **Instructions**
 
-1. Remove `GlobalSearchInput` and its usage from desktop header (and mobile if present).
-2. Do not leave a dead search box.
-3. If search is needed later, wire to real `/search` and gate by permissions.
+- API list for telecaller: all visits where `telecaller_id = me`, company-scoped, until terminal states.
+- **Active tab:** status **not** in `COMPLETED`, `CANCELLED` (and any dead ends you use).
+- **Completed tab:** `COMPLETED` (optional sub: `CANCELLED` or separate Cancelled).
+- Sort: soonest `scheduled_date` first on Active.
+
+### 2. Card details (including PM)
+
+**Show at least**
+
+- Booking code, lead/customer, phone (when allowed), scheduled date/time
+- Property / project / unit
+- Status
+- **Booked by (telecaller)**
+- **Accepted by (PM):** name, code, phone — from `project_manager` **after accept**
+- While `PENDING_ACCEPTANCE`: show **“Awaiting PM acceptance”** and **routed PM** if `project_manager_id` is already set at book time
+
+Ensure `listVisits` always includes `project_manager { id, full_name, employee_code, phone }` for the telecaller’s own visits (no blind PII strip for the booking telecaller — already special-cased in places; keep that).
+
+### 3. Reschedule + Cancel from book until complete
+
+**Active statuses** (examples):  
+`PENDING_ACCEPTANCE`, `ACCEPTED`, `PENDING_CUSTOMER_RECONFIRMATION`, `CONFIRMED`, `RESCHEDULE_*`, `ON_HOLD`, etc. — **everything except** `COMPLETED` / `CANCELLED`.
+
+**UI (telecaller + `SITE_VISITS_VERIFY` or dedicated perms)**
+
+- **Reschedule** → existing reschedule API; after reschedule keep PM reconfirm flow if required.
+- **Cancel** → existing initiate-cancel / cancel flow; allow from these open statuses (not only hold/reconfirm).
+
+**Do not** hide these behind “only tomorrow” or only `PENDING_CUSTOMER_RECONFIRMATION`.
+
+**Backend**
+
+- Allow `reschedule` and cancel transitions from the open statuses above (state machine), with same company + telecaller ownership checks.
+- After `COMPLETED`, **no** reschedule/cancel on the active card (completed tab is read-only or limited).
+
+### 4. Completed tab
+
+**Instructions**
+
+- Site Visits page: tabs **Active** | **Completed**.
+- Active: non-terminal.
+- Completed: `COMPLETED` (and decide if cancelled lives here or under Active filters).
+- Moving to completed is automatic when status becomes `COMPLETED` (no manual move).
+
+### 5. One day before = notification to reconfirm only
+
+**Instructions**
+
+- **Job (daily IST):** visits with `scheduled_date` = tomorrow, status still open → `notifyEmployee(telecaller_id, { type: RECONFIRM_REMINDER, … link: '/site-visits' })`.
+- Optional: notify PM.
+- **Do not** use T−1 to first show Reschedule/Cancel.
+- Dashboard “tomorrow” banner may remain as extra UX; primary requirement is **notification**.
+- Optional: **Reconfirm with customer** button stays available on open visits (any day), and T−1 notification reminds them to use it.
 
 ---
 
-## E. Notifications (your items 5–7)
+## Acceptance criteria
 
-### E1. Desktop drawer shows only half the list
-
-**Problem**  
-Drawer list uses `max-h-[420px] overflow-y-auto`. On desktop, panel/parent overflow or height often clips content so only part of the list is usable.
-
-**Instructions**
-
-1. Desktop panel: full viewport-aware height (e.g. `max-h-[min(70vh,640px)]` or flex column with `flex-1 min-h-0 overflow-y-auto` on the list only).
-2. Ensure parent is not `overflow: hidden` without scroll on the list.
-3. Test laptop + wide desktop with 20+ notifications; every row reachable by scroll.
-4. Mobile already OK — don’t break it.
-
-### E2. No remove/dismiss per notification
-
-**Problem**  
-API only: list + mark read. No dismiss/delete. UI has mark-read (check), not remove/cross.
-
-**Instructions**
-
-1. Backend: `DELETE /notifications/:id` or `PATCH .../dismiss` with soft flag `dismissed_at` / `hidden_from_inbox` (prefer soft delete so history works).
-2. Scope: only own `employee_id`.
-3. FE: cross/remove on each row in main inbox → call dismiss → remove from main list only.
-4. Do **not** hard-delete if history is required.
-
-### E3. No notification history
-
-**Problem**  
-`GET /notifications` is last 20, no history endpoint, no history UI.
-
-**Instructions**
-
-1. `GET /notifications?scope=inbox|history` (or `/notifications/history`).
-   - Inbox: not dismissed, recent.
-   - History: all for user including dismissed/read, paginated.
-2. FE: “Notification history” entry (bell menu or Account).
-3. History shows removed items; inbox does not.
-4. Optional: mark read from history; still no hard delete unless admin policy requires it.
+1. Telecaller books visit → appears on **Site Visits → Active** with details.
+2. After PM accepts → same card shows **PM name/contact**.
+3. From booking (or from accept if you keep PM-first) until complete: **Reschedule** and **Cancel** visible and working.
+4. On complete → card leaves Active, shows under **Completed**.
+5. Calendar day before visit → telecaller gets **reconfirm notification**; actions were already available earlier.
 
 ---
 
-## F. Account — roles & responsibilities (your item 8)
+## Relation to other remaining work
 
-### F1. Account section does not clearly show role rules for everyone
+This **replaces/clarifies** the earlier “day-before options” item:
 
-**Instructions**
+- **Actions:** from booked (open) until completed.
+- **T−1:** notification to reconfirm only.
+- **Completed:** own tab.
+- **PM details:** on card after accept (and routed PM while pending if available).
 
-1. Account / Profile: section **Roles & responsibilities**.
-2. **Common rules (all roles):** attendance expectations, data privacy, lead handling ethics, EOD report, no sharing credentials, etc.
-3. **Role-specific block** for `activeRole` (and each assigned role if multi-role): what they can do, what they must do, what they must not do — driven from one content map keyed by `Roles.*`.
-4. Same content for every user of that role (no empty state for staff).
+Still separate: field-work attendance, notification history query, ungated nav, profile role copy, etc.
 
----
-
-## G. Performance scoring guide (your item 9)
-
-### G1. Scoring Guide & Matrix incomplete vs real rules
-
-**Problem**  
-Backend has concrete weights (`PERFORMANCE_WEIGHTS`: task +2, report +0.5, booking +10, late −1, half-day −1, uninformed absent −2, midnight auto-checkout −1, missing EOD −1, etc. + tier multipliers). UI matrix does not fully explain approval outcomes for late / leave / emergency logout.
-
-**Instructions**  
-Update **Scoring Guide & Matrix** on My Performance to list **every** active rule in plain language:
-
-| Event                                                | Effect (document actual numbers from code)                                                                        |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Complete task                                        | +                                                                                                                 |
-| Submit daily report                                  | +                                                                                                                 |
-| Booking / target exceeded / completed all work       | +                                                                                                                 |
-| Late (unapproved)                                    | −                                                                                                                 |
-| Half day                                             | −                                                                                                                 |
-| Below target / overdue task                          | −                                                                                                                 |
-| Uninformed absent                                    | −                                                                                                                 |
-| Midnight auto-checkout                               | −                                                                                                                 |
-| Missing daily report                                 | −                                                                                                                 |
-| **Late / leave / emergency logout request APPROVED** | Attendance treated normal (or stated policy); **no** (or reduced) penalty — match real attendance→performance job |
-| **Same request REJECTED**                            | Count as late/absent/penalty as coded — show exact −                                                              |
-
-Also show tier multipliers (e.g. Danger penalties ×1.25, Excellent boosts ×1.1) if still applied.  
-Keep UI in sync with `performance-metric.ts` — one source of truth or generate copy from the same constants.
+**Full remaining gaps & failures** — `ASgrouptechnicalteam/crm` (current product + code)
 
 ---
 
-## H. PM field attendance (your item 10)
+## A. Site visits — telecaller workflow (your latest rules)
 
-### H1. No proper “field / offsite work” flow for Project Managers
+### A1. Booked visits not managed as “Active vs Completed” for telecallers
 
-**Problem**  
-Attendance is kiosk/QR-oriented. PMs on site/verification/office work cannot login/logout at kiosk. Need request-based attendance with approval and EOD auto-logout.
+- **Need:** After book → show on Site Visits with full details; after complete → **Completed** tab only.
+- **Now:** One mixed pipeline/grid + stepper; no clear **Active | Completed** tabs for telecallers.
+- **Fix:** Active = not `COMPLETED`/`CANCELLED`; Completed = `COMPLETED`; filter by `telecaller_id = me`.
 
-**Instructions**
+### A2. PM-accepted details incomplete / unclear on telecaller cards
 
-**A. Request (PM)**
+- **Need:** All details including **PM who accepted** (name/code/phone).
+- **Now:** `project_manager` can show after accept; before accept often “awaiting PM”; not consistently presented as required detail set.
+- **Fix:** Always return/show PM when set; while pending show “Awaiting acceptance” + routed PM if known.
 
-1. “Field / offsite attendance” request: reason (required), work type (site visit / project verification / office work / other), expected start (and optional end).
-2. Submit → status `PENDING`.
+### A3. Reschedule / Cancel not available from booking until complete
 
-**B. Attendance while pending**  
-3. Product rule you stated: **while pending or approved, day counts as normal attendance** (present from request time).  
-4. **Only if rejected** → mark **absent** (or revoke present and apply absent penalty).
+- **Need:** **Reschedule** and **Cancel** from open visit until completed.
+- **Now:** Mostly after `ACCEPTED` / reconfirm/hold paths; not from early open statuses through to pre-complete.
+- **Fix:** UI + state machine allow both for telecaller-owned open statuses; hide after `COMPLETED`/`CANCELLED`.
 
-**C. Approval**  
-5. Approver: MD / HR (use existing attendance proposal permissions).  
-6. Approve → keep present; Reject → absent + performance impact per matrix.
+### A4. Day-before treated as action window, not notify-only
 
-**D. EOD**  
-7. On day of approved/pending field request, when PM submits **daily EOD report**, system **records logout** at submit time (or end of IST workday policy — pick one and document).  
-8. No kiosk logout required that day.
-
-**E. Edge cases**  
-9. Reject after EOD already submitted → define rule (e.g. convert to absent + notify; adjust performance job).  
-10. Multiple requests same day → one open request only.  
-11. Sidebar: show this action only for roles allowed (PM + any other field roles you include).
-
-Wire into existing `attendance/proposals` if it already supports types; otherwise extend proposal types and rollup job.
+- **Need:** **1 day before** → **notification to reconfirm only**; actions already available earlier.
+- **Now:** Dashboard **“Reconfirm Tomorrow's Visits”** is T+1-only; reconfirm flow still status-tied; no solid dedicated T−1 notification job as the main rule.
+- **Fix:** Cron/job T−1 → notify telecaller (link `/site-visits`); do not gate Reschedule/Cancel on “tomorrow.”
 
 ---
 
-## I. Previously fixed (do not reopen unless regression)
+## B. Notifications
 
-- Task priority persisted
-- Demo assignee names
+### B1. History = dismissed only
+
+- **Need:** Full history including dismissed.
+- **Now:** `scope=history` → `is_dismissed: true` only.
+- **Fix:** History = all for user; inbox = not dismissed.
+
+### B2. Desktop list height still ~420px
+
+- **Need:** Full scrollable list on desktop.
+- **Now:** Inner list `max-h-[420px]` can still clip.
+- **Fix:** Viewport-based max height + `min-h-0 overflow-y-auto`.
+
+---
+
+## C. Attendance — field / PM offsite
+
+### C1. Field work does not fully drive present/absent
+
+- **Need:** Pending/approved field → present; rejected → absent (+ performance).
+- **Now:** Submit `FIELD_WORK` exists; approve path mainly handles `LATE_CHECKIN`; reject copy still leave/late-oriented.
+- **Fix:** Approve/reject handlers for `FIELD_WORK`; rollup uses proposal status.
+
+### C2. EOD auto-logout only partial relative to field rules
+
+- **Need:** On field day, EOD submit records logout.
+- **Now:** EOD can set `check_out_at` if missing; not clearly tied only to field-day policy.
+- **Fix:** Confirm field-day present + EOD checkout together in one rule set.
+
+---
+
+## D. Permissions & navigation
+
+### D1. Some nav items still ungated
+
+- **Examples:** Complaints, Sales Pipeline (personal items like profile may stay open).
+- **Effect:** Open page → 403/empty.
+- **Fix:** `COMPLAINTS_READ`, pipeline/`LEADS_READ` (or real opp perm); hide dead actions.
+
+### D2. Profile “Roles & responsibilities” key mismatch
+
+- **Now:** `roleCopy` uses `ADMIN`, `TELECALLER`, …; real roles are `Admin (Technical)`, `telecallers`, etc.
+- **Effect:** Generic “Standard employee access.”
+- **Fix:** Key by `Roles.*`; common rules for all; all real roles.
+
+### D3. Auth middleware inconsistency
+
+- Some routes `requirePermission`, some `requireAuthz` (DB overrides).
+- **Risk:** UI grant applies on some APIs only after refresh.
+- **Fix:** Prefer DB-aware authz on mutating routes.
+
+---
+
+## E. Performance scoring guide
+
+### E1. Approved vs rejected attendance not fully explained
+
+- Boosts/penalties listed; **approved** late/leave/emergency logout vs **rejected** impact not fully clear.
+- **Fix:** Explicit +/− rows matched to `PERFORMANCE_WEIGHTS` / rollup jobs.
+
+---
+
+## F. Distribution / polish
+
+### F1. Equal load — minor
+
+- Lowest `activeLeadCount` is in place.
+- **Optional:** Stable tie-break; remove “performance-weighted assignment” wording in UI/docs.
+
+### F2. Agent Approvals empty state
+
+- Agent sees Approvals if they have ACCEPT; list only visits routed to them.
+- **Fix:** Clear empty copy if by design; or change list policy if product differs.
+
+---
+
+## G. Structural / deferred
+
+### G1. Customer portal still empty (`mountPortal` no-op)
+
+### G2. Thin typed FE API layer (mostly ad-hoc `fetchWithAuth`)
+
+### G3. Deploy ops
+
+- Ensure notification dismiss columns migrated.
+- Ensure `site_visits.accept` seeded on Agent/PM/SM in DB.
+
+---
+
+## Already fixed (do not treat as open)
+
+- Accept: route + service + policy use `SITE_VISITS_ACCEPT`; web matrix includes it
+- Approvals nav permission-gated; reassign targets include Agent
+- Task priority + IST display
 - Drop + `exit_reason`
-- Bulk gated mainly by `LEADS_BULK_UPLOAD`
-- Added-by-me includes assigned leads
-- Task deadline IST
-- Boot sync does not restore revoked permissions
-- packages/shared ≈ API auth
+- Demo assignee names
+- Bulk → `LEADS_BULK_UPLOAD`
+- Added-by-me includes assigned
+- Equal telecaller assignment (load-based)
+- Global search removed
+- Notification soft dismiss + Inbox/History UI (history **semantics** still wrong — B1)
+- Permission keys aligned API / web / packages
 
 ---
 
-## J. Other remaining gaps (short)
+## Priority order
 
-| ID  | Issue                          | Instruction                                                        |
-| --- | ------------------------------ | ------------------------------------------------------------------ |
-| J1  | Dual employee endpoints        | Standardize on one list API for assignees                          |
-| J2  | Thin typed API client          | Prefer clients for leads, visits, demos, notifications, attendance |
-| J3  | Customer portal empty          | Out of scope unless product prioritizes                            |
-| J4  | Equal vs weighted distribution | See C1 — product says equal                                        |
-
----
-
-## Priority order for work
-
-1. **P0:** A1–A3 (accept service/policy + UI + reassign targets)
-2. **P0:** B1 (sidebar/actions only if allowed)
-3. **P1:** C1 equal telecaller distribution
-4. **P1:** D1 remove global search
-5. **P1:** E1–E3 notifications (desktop scroll, dismiss, history)
-6. **P2:** F1 account roles text
-7. **P2:** G1 full scoring guide including approval outcomes
-8. **P2:** H1 PM field attendance + EOD logout
+| Pri    | IDs                  | Focus                                                                                               |
+| ------ | -------------------- | --------------------------------------------------------------------------------------------------- |
+| **P0** | **A1–A4**            | Telecaller site visits: Active/Completed, details+PM, Reschedule/Cancel until done, T−1 notify only |
+| **P0** | **B1**               | Notification history query                                                                          |
+| **P1** | **C1–C2**            | Field work present/absent + EOD                                                                     |
+| **P1** | **D1–D2**            | Nav gates + role copy                                                                               |
+| **P1** | **B2, E1**           | Desktop notif height; scoring approval text                                                         |
+| **P2** | **D3, F1–F2, G1–G3** | Authz consistency, polish, portal, ops                                                              |
 
 ---
 
 ## One-line summary
 
-Still-breaking bugs: **accept path (service/policy), Agent UI, nav showing forbidden items**. Product gaps to build: **equal lead distribution, remove search, strict sidebar, notification dismiss/history + desktop layout, account role rules, full scoring guide, PM field attendance with approve/reject and EOD logout**.
+**Biggest open product gap:** telecaller site visits must show from **book → complete** with **details + PM**, **Reschedule/Cancel** the whole time, **Completed tab** after done, and **T−1 reconfirm notification only**.
+
+**Biggest open tech gaps:** notification **history filter**, **field-work attendance outcomes**, **ungated nav**, **roleCopy** mismatch.

@@ -14,7 +14,10 @@ export async function cancelVisit(user: TokenPayload, visitId: number, reason?: 
     include: { lead: true },
   });
   if (!visit) throw { status: 404, message: 'Site visit booking not found' };
-  if (!can(user, Permissions.SITE_VISITS_COMPLETE, visit)) {
+  if (
+    !can(user, Permissions.SITE_VISITS_COMPLETE, visit) &&
+    !SiteVisitPolicy.canHoldOrInitiateCancel(user, visit)
+  ) {
     throw { status: 403, message: 'Forbidden: Missing permission to cancel site visits' };
   }
   return applyTransition(

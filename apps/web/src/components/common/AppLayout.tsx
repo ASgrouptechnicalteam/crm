@@ -239,7 +239,13 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     ],
     requiredPermission: Permissions.CUSTOMERS_READ,
   },
-  { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, path: '/complaints' },
+  {
+    id: 'complaints',
+    label: 'Complaints',
+    icon: MessageSquareWarning,
+    path: '/complaints',
+    requiredPermission: Permissions.COMPLAINTS_READ,
+  },
   {
     id: 'site-visits',
     label: 'Site Visits',

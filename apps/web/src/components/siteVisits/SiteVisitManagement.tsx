@@ -166,6 +166,7 @@ export const SiteVisitManagement: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'COMPLETED'>('ACTIVE');
 
   // Modals
   const [selectedVisit, setSelectedVisit] = useState<SiteVisit | null>(null);
@@ -607,6 +608,14 @@ export const SiteVisitManagement: React.FC = () => {
     }
   };
 
+  const filteredVisits = visits.filter((visit) => {
+    if (activeTab === 'ACTIVE') {
+      return visit.status !== 'COMPLETED' && visit.status !== 'CANCELLED';
+    } else {
+      return visit.status === 'COMPLETED' || visit.status === 'CANCELLED';
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -629,7 +638,7 @@ export const SiteVisitManagement: React.FC = () => {
             <span className="text-[10px] uppercase font-bold text-navy-300 block">
               Total Site Visits
             </span>
-            <span className="text-lg font-black text-white">{visits.length} Scheduled</span>
+            <span className="text-lg font-black text-white">{filteredVisits.length} Scheduled</span>
           </div>
         </div>
       </div>
@@ -641,18 +650,42 @@ export const SiteVisitManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200">
+        <button
+          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors ${
+            activeTab === 'ACTIVE'
+              ? 'border-navy-600 text-navy-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+          onClick={() => setActiveTab('ACTIVE')}
+        >
+          Active
+        </button>
+        <button
+          className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors ${
+            activeTab === 'COMPLETED'
+              ? 'border-navy-600 text-navy-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+          onClick={() => setActiveTab('COMPLETED')}
+        >
+          Completed
+        </button>
+      </div>
+
       {/* Visits Grid */}
       {isLoading ? (
         <div className="py-12 text-center text-xs text-slate-400">
           Loading site visit bookings...
         </div>
-      ) : visits.length === 0 ? (
+      ) : filteredVisits.length === 0 ? (
         <div className="py-12 text-center text-xs text-slate-400">
-          No site visits currently scheduled. Book site visits directly inside Lead Details
+          No site visits found in this tab.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {visits.map((visit) => (
+          {filteredVisits.map((visit) => (
             <div
               key={visit.id}
               className="bg-white rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-shadow p-5 space-y-4 flex flex-col justify-between"
@@ -699,8 +732,12 @@ export const SiteVisitManagement: React.FC = () => {
 
                   {visit.project_manager && (
                     <div className="text-[11px] text-slate-500">
-                      <span className="font-bold text-slate-700">PM Oversight:</span>{' '}
-                      {visit.project_manager?.full_name}
+                      <span className="font-bold text-slate-700">
+                        {visit.status === 'PENDING_ACCEPTANCE'
+                          ? 'Awaiting PM acceptance:'
+                          : 'Accepted by (PM):'}
+                      </span>{' '}
+                      {visit.project_manager?.full_name} ({visit.project_manager?.phone})
                     </div>
                   )}
 
@@ -764,21 +801,6 @@ export const SiteVisitManagement: React.FC = () => {
                   </button>
                 )}
 
-                {/* ─── ACCEPTED: Reschedule allowed early (Bug 5 fix) ─── */}
-                {visit.status === 'ACCEPTED' && canVerify && (
-                  <button
-                    onClick={() => {
-                      setSelectedVisit(visit);
-                      setRescheduleSuccess(false);
-                      setShowRescheduleModal(true);
-                    }}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Reschedule Visit</span>
-                  </button>
-                )}
-
                 {/* ─── PENDING_CUSTOMER_RECONFIRMATION ─── */}
                 {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && canVerify && (
                   <button
@@ -810,21 +832,6 @@ export const SiteVisitManagement: React.FC = () => {
                   >
                     <Send className="w-3 h-3" />
                     <span>Send Day-Before WA Reminder</span>
-                  </button>
-                )}
-
-                {/* Reschedule from PENDING_CUSTOMER_RECONFIRMATION (Bug 5 fix) */}
-                {visit.status === 'PENDING_CUSTOMER_RECONFIRMATION' && canVerify && (
-                  <button
-                    onClick={() => {
-                      setSelectedVisit(visit);
-                      setRescheduleSuccess(false);
-                      setShowRescheduleModal(true);
-                    }}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Reschedule Instead</span>
                   </button>
                 )}
 
@@ -1040,20 +1047,6 @@ export const SiteVisitManagement: React.FC = () => {
                   </>
                 )}
 
-                {visit.status === 'CONFIRMED' && canVerify && (
-                  <button
-                    onClick={() => {
-                      setSelectedVisit(visit);
-                      setRescheduleSuccess(false);
-                      setShowRescheduleModal(true);
-                    }}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Reschedule Visit</span>
-                  </button>
-                )}
-
                 {/* COMPLETE is only valid from ACTIVE (siteVisit.workflow.ts),
                     never directly from CONFIRMED — START is the missing step. */}
                 {visit.status === 'CONFIRMED' && canComplete && (
@@ -1102,6 +1095,38 @@ export const SiteVisitManagement: React.FC = () => {
                     <span>Record Visit Feedback & Photo</span>
                   </button>
                 )}
+
+                {/* ─── GENERIC RESCHEDULE & CANCEL ─── */}
+                {visit.status !== 'COMPLETED' &&
+                  visit.status !== 'CANCELLED' &&
+                  visit.status !== 'ON_HOLD' &&
+                  visit.status !== 'CANCELLATION_PENDING_PM_CONFIRMATION' &&
+                  canVerify && (
+                    <div className="flex gap-2 w-full pt-1">
+                      <button
+                        onClick={() => {
+                          setSelectedVisit(visit);
+                          setRescheduleSuccess(false);
+                          setShowRescheduleModal(true);
+                        }}
+                        className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Reschedule</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedVisit(visit);
+                          setCancelReason('');
+                          setShowConfirmCancelModal(true);
+                        }}
+                        className="flex-1 py-2 bg-white border border-rose-600 text-rose-600 hover:bg-rose-50 font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+                    </div>
+                  )}
 
                 {/* ─── COMPLETED ─── */}
                 {visit.status === 'COMPLETED' && (
