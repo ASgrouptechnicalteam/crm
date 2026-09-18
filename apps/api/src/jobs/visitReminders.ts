@@ -33,7 +33,7 @@ export const siteVisitReconfirmReminderJob = async () => {
     const startOfTomorrowUtc = new Date(startOfTomorrowIst.getTime() - 5.5 * 60 * 60 * 1000);
     const endOfTomorrowUtc = new Date(endOfTomorrowIst.getTime() - 5.5 * 60 * 60 * 1000);
 
-    logger.debug(
+    logger.info(
       `[visitReminders] Querying visits scheduled between ${startOfTomorrowUtc.toISOString()} and ${endOfTomorrowUtc.toISOString()}`,
     );
 
