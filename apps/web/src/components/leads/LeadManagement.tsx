@@ -234,8 +234,9 @@ export const LeadManagement: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
 
   const fetchEmployees = async () => {
+    if (!user?.permissions?.includes(Permissions.EMPLOYEES_READ)) return;
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/md/employees`);
+      const res = await fetchWithAuth(`${API_BASE_URL}/employees`);
       const data = await res.json();
       if (res.ok) {
         setEmployees(data.employees || []);
@@ -256,11 +257,7 @@ export const LeadManagement: React.FC = () => {
   const [bulkHeaderMatched, setBulkHeaderMatched] = useState(true);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
 
-  const canBulkUpload =
-    user?.permissions?.includes(Permissions.LEADS_BULK_UPLOAD) ||
-    activeRole === Roles.ADMIN ||
-    activeRole === Roles.MARKETING_DIRECTOR ||
-    activeRole === Roles.MD;
+  const canBulkUpload = !!user?.permissions?.includes(Permissions.LEADS_BULK_UPLOAD);
   const canCreateLead =
     !!user?.permissions?.includes(Permissions.LEADS_CREATE) || activeRole === Roles.ADMIN;
 

@@ -18,7 +18,7 @@ export async function acceptVisit(user: TokenPayload, visitId: number, notes?: s
     include: { lead: true },
   });
   if (!visit) throw { status: 404, message: 'Site visit booking not found' };
-  if (!can(user, Permissions.SITE_VISITS_ASSIGN_AGENT, visit)) {
+  if (!can(user, Permissions.SITE_VISITS_ACCEPT, visit)) {
     throw { status: 403, message: 'Forbidden: Missing permission to accept site visits' };
   }
   if (!SiteVisitPolicy.canAccept(user, visit)) {

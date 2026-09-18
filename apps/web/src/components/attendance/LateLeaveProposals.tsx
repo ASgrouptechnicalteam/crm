@@ -12,7 +12,7 @@ interface LateLeaveProposalsProps {
 export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOnly = false }) => {
   const { user, fetchWithAuth, activeRole } = useAuth();
   const [activeTab, setActiveTab] = useState<'submit' | 'queue'>(hrViewOnly ? 'queue' : 'submit');
-  const [proposalType, setProposalType] = useState<'late' | 'leave'>('late');
+  const [proposalType, setProposalType] = useState<'late' | 'leave' | 'field_work'>('late');
 
   // Form states
   const [date, setDate] = useState('');
@@ -126,6 +126,35 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
     }
   };
 
+  const handleSubmitFieldWork = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/attendance/field-work-proposal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: date || new Date().toISOString().split('T')[0],
+          reason,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Field work request submitted to HR.' });
+        setReason('');
+      } else {
+        const err = await res.json();
+        setMessage({ type: 'error', text: err.error || 'Failed to submit.' });
+      }
+    } catch (e) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
       {/* Header Tabs */}
@@ -180,7 +209,7 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
       {activeTab === 'submit' && !hrViewOnly ? (
         <div>
           {/* Proposal Type Toggle */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="grid grid-cols-3 gap-3 mb-5">
             <button
               type="button"
               onClick={() => setProposalType('late')}
@@ -192,11 +221,9 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
             >
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-navy-700" />
-                <span>Late Arrival Request</span>
+                <span>Late Arrival</span>
               </div>
-              <p className="text-[11px] text-slate-500 font-normal mt-1">
-                Must submit before 09:30 AM IST same day
-              </p>
+              <p className="text-[11px] text-slate-500 font-normal mt-1">Before 09:30 AM</p>
             </button>
 
             <button
@@ -210,11 +237,25 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
             >
               <div className="flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-navy-700" />
-                <span>Leave Request</span>
+                <span>Leave</span>
               </div>
-              <p className="text-[11px] text-slate-500 font-normal mt-1">
-                Must submit ≥ 1 day in advance
-              </p>
+              <p className="text-[11px] text-slate-500 font-normal mt-1">≥ 1 day advance</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setProposalType('field_work')}
+              className={`p-3 rounded-xl border text-left transition-all ${
+                proposalType === 'field_work'
+                  ? 'border-navy-600 bg-navy-50/50 text-navy-900 font-bold'
+                  : 'border-slate-200 text-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-sm">
+                <Send className="w-4 h-4 text-navy-700" />
+                <span>Field Work</span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal mt-1">Client visits/Meetings</p>
             </button>
           </div>
 
@@ -268,7 +309,7 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
                 <span>Submit Late Request</span>
               </button>
             </form>
-          ) : (
+          ) : proposalType === 'leave' ? (
             <form onSubmit={handleSubmitLeave} className="space-y-4 max-w-lg">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -370,7 +411,42 @@ export const LateLeaveProposals: React.FC<LateLeaveProposalsProps> = ({ hrViewOn
                 <span>Submit Leave Request</span>
               </button>
             </form>
-          )}
+          ) : proposalType === 'field_work' ? (
+            <form onSubmit={handleSubmitFieldWork} className="space-y-4 max-w-lg">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  required
+                  className="w-full p-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Reason & Location
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                  rows={3}
+                  placeholder="e.g. Field visit at XYZ site..."
+                  className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-5 py-2.5 bg-navy-700 hover:bg-navy-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                <span>Submit Field Work Request</span>
+              </button>
+            </form>
+          ) : null}
         </div>
       ) : (
         /* HR Queue View */

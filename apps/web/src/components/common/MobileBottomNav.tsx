@@ -11,9 +11,12 @@ export const MobileBottomNav: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const userPermissions = user?.permissions ?? [];
-  const isVisible = (item: SidebarNavItem): boolean =>
-    (!item.requiredPermission || userPermissions.includes(item.requiredPermission)) &&
-    (!item.requiredAnyRole || item.requiredAnyRole.includes(activeRole));
+  const isVisible = (item: SidebarNavItem): boolean => {
+    const hasPermission = item.requiredPermission
+      ? item.requiredPermission.split('|').some((p) => userPermissions.includes(p.trim()))
+      : true;
+    return hasPermission && (!item.requiredAnyRole || item.requiredAnyRole.includes(activeRole));
+  };
 
   // Drawer grouping logic — mirrors AppLayout's SidebarNav exactly, including
   // its fallback for items that appear before the first `group: true` marker

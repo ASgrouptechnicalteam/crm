@@ -395,9 +395,6 @@ model Employee {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  @@index([company_id])
-  @@index([branch_id])
-  @@index([company_id, created_at])
   // QA 2026-09-14 "duplicate employees with same phone/email": phone/email
   // only carried a plain index, so nothing stopped two employees in the same
   // company holding the same number. The app layer (employeeContact.service.ts)
@@ -407,6 +404,9 @@ model Employee {
   // the three guarded routes (create / admin update / self-update).
   @@unique([company_id, phone])
   @@unique([company_id, email])
+  @@index([company_id])
+  @@index([branch_id])
+  @@index([company_id, created_at])
 }
 
 /// § Phase 6: a registered platform-authenticator credential (Windows Hello,
@@ -436,18 +436,18 @@ model WebAuthnCredential {
 // goes out in the link and is never persisted (only its SHA-256 hash),
 // following the same pattern AuthSession uses for refresh tokens.
 model SiteVisitFeedback {
-  id               Int       @id @default(autoincrement())
-  site_visit_id    Int       @unique
-  rated_employee_id Int      // whoever actually ran the visit — snapshotted at creation so a later reassignment can't change who a submitted rating counts against
-  token_hash       String    @unique
-  expires_at       DateTime
-  submitted_at     DateTime?
-  rating           Int? // 1-5 stars
-  on_time          Boolean? // "Did the representative arrive on time?"
-  answered_questions Boolean? // "Did they answer your questions properly?"
+  id                    Int       @id @default(autoincrement())
+  site_visit_id         Int       @unique
+  rated_employee_id     Int // whoever actually ran the visit — snapshotted at creation so a later reassignment can't change who a submitted rating counts against
+  token_hash            String    @unique
+  expires_at            DateTime
+  submitted_at          DateTime?
+  rating                Int? // 1-5 stars
+  on_time               Boolean? // "Did the representative arrive on time?"
+  answered_questions    Boolean? // "Did they answer your questions properly?"
   property_as_described Boolean? // "Was the property as described?"
-  comment          String?   @db.Text
-  created_at       DateTime  @default(now())
+  comment               String?   @db.Text
+  created_at            DateTime  @default(now())
 
   site_visit     SiteVisitBooking @relation(fields: [site_visit_id], references: [id], onDelete: Cascade)
   rated_employee Employee         @relation("RatedInFeedback", fields: [rated_employee_id], references: [id])
@@ -457,20 +457,20 @@ model SiteVisitFeedback {
 }
 
 model Role {
-  id           Int     @id @default(autoincrement())
-  name         String  @unique
-  is_system    Boolean @default(false)
-  is_invisible Boolean @default(false)
+  id                          Int     @id @default(autoincrement())
+  name                        String  @unique
+  is_system                   Boolean @default(false)
+  is_invisible                Boolean @default(false)
   // Where this role currently sits in its own permission_history timeline —
   // 0 means "no history yet" / "undone all the way back to before the first
   // recorded change". Undo moves this left, Redo moves it right; saving a
   // fresh change from a non-tip position truncates everything past it first
   // (the standard undo-stack rule: a new edit discards the abandoned redo
   // branch, exactly like a text editor).
-  permission_history_position Int @default(0)
+  permission_history_position Int     @default(0)
 
-  permissions       RolePermission[]
-  employees         EmployeeRole[]
+  permissions        RolePermission[]
+  employees          EmployeeRole[]
   permission_history RolePermissionHistory[]
 }
 
@@ -658,6 +658,7 @@ model Task {
   completed_at   DateTime?
   lead_id        Int?
   opportunity_id Int?
+  priority       String    @default("MEDIUM")
 
   assignee    Employee     @relation("AssignedTasks", fields: [assignee_id], references: [id], onDelete: Cascade)
   lead        Lead?        @relation(fields: [lead_id], references: [id], onDelete: Cascade)
@@ -703,15 +704,17 @@ model AuditEvent {
 }
 
 model Notification {
-  id          Int      @id @default(autoincrement())
-  employee_id Int
-  type        String // TARGET_ASSIGNED, TASK_OVERDUE, PROPOSAL_APPROVED, SYSTEM_ALERT
-  title       String
-  message     String
-  is_read     Boolean  @default(false)
-  entity_type String?
-  entity_id   Int?
-  created_at  DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  employee_id  Int
+  type         String // TARGET_ASSIGNED, TASK_OVERDUE, PROPOSAL_APPROVED, SYSTEM_ALERT
+  title        String
+  message      String
+  is_read      Boolean   @default(false)
+  is_dismissed Boolean   @default(false)
+  dismissed_at DateTime?
+  entity_type  String?
+  entity_id    Int?
+  created_at   DateTime  @default(now())
 
   employee Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
 
@@ -987,11 +990,11 @@ model Project {
   // PENDING_VERIFICATION is kept as a legacy value only (old rows already in
   // that state map to PENDING_MD_APPROVAL, since they'd already passed PM
   // submission under the old flow) — never written by new code.
-  verification_status  String    @default("DRAFT") // DRAFT | PENDING_DM_POLISH | PENDING_MD_APPROVAL | VERIFIED | REJECTED | PENDING_VERIFICATION (legacy)
-  verified_by_id       Int?
-  verified_at          DateTime?
-  verification_notes   String?   @db.Text
-  created_by_id        Int?
+  verification_status String    @default("DRAFT") // DRAFT | PENDING_DM_POLISH | PENDING_MD_APPROVAL | VERIFIED | REJECTED | PENDING_VERIFICATION (legacy)
+  verified_by_id      Int?
+  verified_at         DateTime?
+  verification_notes  String?   @db.Text
+  created_by_id       Int?
 
   // Set during the DM polish step -- mirrors Property's own fields exactly
   // (digital_marketing_executive_id/seo_title/seo_keywords on Property).
@@ -1169,13 +1172,13 @@ model ProjectUnit {
   documents      ProjectUnitDocument[]
   layout_regions PropertyLayoutRegion[]
 
-  bookings         Booking[]
-  opportunities    Opportunity[]
-  interested_leads LeadPropertyInterest[]
-  site_visits      SiteVisitBooking[]
-  site_visit_links SiteVisitProperty[]
-  complaints       Complaint[]              @relation("ProjectUnitComplaints")
-  demo_interests   DemoInterestedProperty[]
+  bookings           Booking[]
+  opportunities      Opportunity[]
+  interested_leads   LeadPropertyInterest[]
+  site_visits        SiteVisitBooking[]
+  site_visit_links   SiteVisitProperty[]
+  complaints         Complaint[]              @relation("ProjectUnitComplaints")
+  demo_interests     DemoInterestedProperty[]
   website_shortlists WebsiteShortlistItem[]
   website_compares   WebsiteCompareItem[]
 
@@ -1283,10 +1286,10 @@ model PropertyPricingRule {
 /// edits therefore require an explicit recalculate (with a diff preview), never
 /// a silent drift.
 model PriceLine {
-  id              Int  @id @default(autoincrement())
-  project_unit_id Int?
-  property_id     Int?
-  rule_id         Int?
+  id               Int  @id @default(autoincrement())
+  project_unit_id  Int?
+  property_id      Int?
+  rule_id          Int?
   // § Phase 3: a Property line sources from PropertyPricingRule, never
   // ProjectPricingRule — a separate FK rather than overloading rule_id,
   // since Prisma has no polymorphic relations. Exactly one of rule_id /
@@ -1307,9 +1310,9 @@ model PriceLine {
 
   created_at DateTime @default(now())
 
-  project_unit ProjectUnit?         @relation(fields: [project_unit_id], references: [id], onDelete: Cascade)
-  property     Property?            @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  rule         ProjectPricingRule?  @relation(fields: [rule_id], references: [id], onDelete: SetNull)
+  project_unit  ProjectUnit?         @relation(fields: [project_unit_id], references: [id], onDelete: Cascade)
+  property      Property?            @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  rule          ProjectPricingRule?  @relation(fields: [rule_id], references: [id], onDelete: SetNull)
   property_rule PropertyPricingRule? @relation("PropertyPriceLineRule", fields: [property_rule_id], references: [id], onDelete: SetNull)
 
   @@index([project_unit_id])
@@ -2376,16 +2379,18 @@ model IntegrationEvent {
 // Employee notifications remain in the separate `Notification` model.
 
 model CustomerNotification {
-  id          Int      @id @default(autoincrement())
-  company_id  Int
-  customer_id Int
-  booking_id  Int?
-  type        String // PORTAL_ACTIVATED, KYC_STATUS_UPDATED
-  title       String
-  message     String
-  is_read     Boolean  @default(false)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  company_id   Int
+  customer_id  Int
+  booking_id   Int?
+  type         String // PORTAL_ACTIVATED, KYC_STATUS_UPDATED
+  title        String
+  message      String
+  is_read      Boolean   @default(false)
+  is_dismissed Boolean   @default(false)
+  dismissed_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
 
   company  Company  @relation(fields: [company_id], references: [id])
   customer Customer @relation(fields: [customer_id], references: [id])
@@ -2449,16 +2454,16 @@ model SiteVisitEscalation {
 }
 
 model Demo {
-  id           Int        @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   lead_id      Int
   handler_id   Int
   scheduled_at DateTime
-  summary      String     @db.Text
-  status       String     @default("PENDING")
-  created_at   DateTime   @default(now())
-  updated_at   DateTime   @updatedAt
-  accepted_at  DateTime?  // When handler accepted the demo request (blind approval)
-  accepted_by  Int?       // Employee ID who accepted (usually the handler themselves)
+  summary      String    @db.Text
+  status       String    @default("PENDING")
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  accepted_at  DateTime? // When handler accepted the demo request (blind approval)
+  accepted_by  Int? // Employee ID who accepted (usually the handler themselves)
 
   lead                  Lead                     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
   handler               Employee                 @relation("DemoHandler", fields: [handler_id], references: [id])
@@ -2736,19 +2741,17 @@ model PropertyFarmLandDetails {
   property Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
 }
 
-
-
 model PerformanceAdjustment {
   id          Int      @id @default(autoincrement())
   employee_id Int
-  adjuster_id Int      
-  points      Float    
+  adjuster_id Int
+  points      Float
   reason      String   @db.Text
   created_at  DateTime @default(now())
 
-  employee    Employee @relation("PerformanceAdjustments", fields: [employee_id], references: [id], onDelete: Cascade)
-  adjuster    Employee @relation("MadePerformanceAdjustments", fields: [adjuster_id], references: [id], onDelete: Restrict)
-  
+  employee Employee @relation("PerformanceAdjustments", fields: [employee_id], references: [id], onDelete: Cascade)
+  adjuster Employee @relation("MadePerformanceAdjustments", fields: [adjuster_id], references: [id], onDelete: Restrict)
+
   @@index([employee_id])
   @@index([created_at])
 }

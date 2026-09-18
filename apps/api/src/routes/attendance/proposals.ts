@@ -133,6 +133,56 @@ router.post(
   },
 );
 
+// POST /api/v1/attendance/field-work-proposal - Submit field work proposal
+router.post(
+  '/field-work-proposal',
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { date, reason } = req.body;
+      if (!date || !reason) {
+        return res.status(400).json({ error: 'Date and reason are required' });
+      }
+
+      // Record proposal in AttendanceProposal table
+      const proposal = await p.attendanceProposal.create({
+        data: {
+          employee_id: req.user!.employeeId,
+          type: 'FIELD_WORK',
+          target_date: new Date(`${date}T00:00:00+05:30`),
+          reason: reason,
+          status: 'PENDING',
+        },
+      });
+
+      // Write AuditEvent so HR sees it
+      await p.auditEvent.create({
+        data: {
+          actor_id: req.user!.employeeId,
+          action: 'SUBMIT_FIELD_WORK_PROPOSAL',
+          entity_type: 'ATTENDANCE_PROPOSAL',
+          entity_id: proposal.id,
+          new_value: JSON.stringify({
+            type: 'FIELD_WORK',
+            target_date: proposal.target_date,
+            reason: reason,
+          }),
+        },
+      });
+
+      return res.status(201).json({
+        message: 'Field work proposal submitted successfully to HR queue',
+        proposalId: proposal.id,
+      });
+    } catch (error: any) {
+      logger.error('Field work proposal error:', error);
+      return res
+        .status(500)
+        .json({ error: 'Failed to submit field work proposal', detail: error?.message });
+    }
+  },
+);
+
 // POST /api/v1/attendance/early-logout-proposal - Submit emergency early logout
 router.post(
   '/early-logout-proposal',

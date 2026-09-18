@@ -1,300 +1,274 @@
-### A. User-reported bugs (verified in code)
+## A. Critical FE ↔ BE (still broken)
 
-**A1. Task priority ignored**
+### A1. Site visit accept still fails for Agent (incomplete Wave 6)
 
-- You set URGENT → UI shows MEDIUM everywhere.
-- Cause: `POST /api/v1/tasks` validates `priority` but never writes it into `prisma.task.create`. DB keeps default.
-- Also: time can look wrong if My Tasks vs Team Tasks format `target_date` differently (timezone/display).
+**Problem**
 
-**A2. Bulk upload permission does not take effect**
+- Route requires `SITE_VISITS_ACCEPT`.
+- `lifecycle.acceptVisit` and `SiteVisitPolicy.canAccept` still check `SITE_VISITS_ASSIGN_AGENT`.
+- Agent matrix has ACCEPT, not ASSIGN → route may pass, service returns 403.
 
-- You grant bulk upload in Permissions page → still blocked or button missing.
-- Cause: effective permission comes from code matrix + DB `RolePermission` + JWT/`user.permissions`. Granting in UI does not reliably refresh the token or align with `RolePermissionsMatrix` / route guard `LEADS_BULK_UPLOAD`.
+**Instructions**
 
-**A3. Add to pool / Add to me missing**
+1. In `apps/api/src/services/siteVisit/lifecycle.ts` → accept uses `Permissions.SITE_VISITS_ACCEPT`.
+2. In `apps/api/src/policies/siteVisit.policy.ts` → `canAccept` uses `SITE_VISITS_ACCEPT`.
+3. Keep ASSIGN only on assign/reassign routes.
+4. Add `SITE_VISITS_ACCEPT` to `apps/web/src/shared` (constant + Agent/PM/SM matrix).
+5. After deploy, restart API once so brand-new permission is seeded onto existing roles.
 
-- Buttons do not appear or do nothing.
-- Cause: UI gated on permissions + lead ownership state; role may lack the required leads permission, or claim/pool endpoints/filters hide actions for valid users.
+### A2. Agent cannot reach Accept UI
 
-**A4. “Leads added by me” disappears after refresh**
+**Problem**  
+Accept only lives in `PMBlindApprovalQueue`, nav `pm-approvals` is `PROJECT_MANAGER | MD | ADMIN` only. Agent never sees Accept even after API fix.
 
-- List shows correctly once, refresh empties or resets to pipeline.
-- Cause: tab state not persisted; refetch uses default pipeline filter and drops `created_by=me` (or equivalent).
+**Instructions**
 
-**A5. Lead Matches shows no projects/units**
+- Show approvals / pending-accept queue for any role with `SITE_VISITS_ACCEPT` (or include Agent).
+- List visits where `project_manager_id === current user` and status `PENDING_ACCEPTANCE`.
+- Update outdated comment “agents cannot accept”.
 
-- Matches tab empty even when inventory exists.
-- Cause: matches only score qualified leads against LIVE properties + VERIFIED projects with AVAILABLE units; UI may still be property-biased; qualification fields empty → zero matches.
+### A3. Reassign target list excludes Agents
 
-**A6. Move to DROPPED → Conflict “exit_reason required”**
+**Problem**  
+Policy allows Agent as reassignment target; UI filters only PM/SM → cannot assign to Agent.
 
-- Drop fails with that message.
-- Cause: some paths call status update with only `{ status: 'DROPPED' }`. Server requires non-empty `exit_reason`. `DropLeadModal` exists and one parent path sends reason correctly; other paths (e.g. detail “Move to DROPPED” without modal) do not.
-
-**A7. Schedule Demo handler list = “Unknown”**
-
-- Dropdown full of “Unknown”.
-- Cause: `/employees/demo-assignees` returns `{ id, label }`. UI uses `formatEmployeeLabel()` which only reads `full_name` / `employee_code` → both missing → “Unknown”.
-
-**A8. Site visit accept → Access denied**
-
-- Accept fails with permission error.
-- Cause: accept route requires a specific permission (e.g. `SITE_VISITS_VERIFY` / related). Role matrix or DB grant missing for the role that should accept. Permissions page grant does not always apply to live requests.
+**Instructions**  
+In reassign dropdown, include employees with `PROJECT_MANAGER` **or** `AGENT`.
 
 ---
 
-### B. Critical structural / permission gaps
+## B. Permissions & navigation (your items 3–4)
 
-**B1. Three sources of truth for roles/permissions**
+### B1. Sidebar not fully permission-driven
 
-- `packages/shared` (stale)
-- `apps/api/src/shared/auth.ts` (what the server uses)
-- `apps/web/src/shared/index.ts` (what the UI uses)
-- Drift causes 403s, missing buttons, and “permission granted but still denied”.
+**Problem**  
+Many items always visible (Leads, Site Visits, Demos, Tasks, Properties, Projects, Complaints, etc.) with only some using `requiredAnyRole`. Little use of `requiredPermission`. Users see pages they cannot use → 403 / empty screens.
 
-**B2. Permissions page can lie**
+**Instructions**
 
-- UI can show a grant that does not match running server matrix or JWT.
-- After toggle, session often still carries old permissions until re-login; some roles never get new keys.
+1. Every nav item that hits a guarded API must set `requiredPermission` (and/or `requiredAnyRole` where role is the product rule).
+2. Filter: show only if `(permission match) AND (role match if set)`.
+3. Examples:
+   - Leads → `LEADS_READ`
+   - Site Visits → `SITE_VISITS_READ`
+   - Demos → `DEMOS_READ`
+   - Tasks → `TASKS_READ`
+   - Properties → `PROPERTIES_READ`
+   - Projects → `PROJECTS_READ`
+   - Bookings → `BOOKINGS_READ`
+   - PM Approvals → `SITE_VISITS_ACCEPT` or `DEMOS_ACCEPT`
+   - Bulk-related only where `LEADS_BULK_UPLOAD`
+4. Same rule for mobile bottom nav and any “quick actions”.
+5. **Never** show a button that only fails with “Access denied”; hide or disable with no dead click.
 
-**B3. ADMIN role inconsistent**
+### B2. Web shared still missing `SITE_VISITS_ACCEPT`
 
-- In one matrix ADMIN is full access; in another it is a curated list missing leads/bulk/etc.
-- ADMIN UI access and API access disagree.
+**Instructions**  
+Mirror API/`packages/shared` into `apps/web/src/shared` so FE gates match BE.
 
-**B4. Roles missing from matrix or DB**
+### B3. Role vs permission mismatches (examples)
 
-- e.g. Channel Partner Manager / STAFF historically missing or incomplete in DB.
-- Assigned employees get zero or incomplete permissions → workflows stop.
+| Screen                 | Risk                                                                |
+| ---------------------- | ------------------------------------------------------------------- |
+| Bulk upload            | Mostly fixed; still role OR for MD/MD-like — prefer permission only |
+| Task assignee dropdown | Needs `EMPLOYEES_READ`; empty without it                            |
+| Lead assign            | Uses `/md/employees` vs elsewhere `/employees`                      |
 
-**B5. Marketing Director / PM / DLO missing read permissions that UI needs**
-
-- Examples already found in code comments: `properties.read` required to even open lists used for polish/approve; `employees.read` required for assignee dropdowns; `tasks.create` / `reports.read_team` required for task UI that the role is shown.
-- Result: form visible, submit or load 403.
-
-**B6. Authorization sometimes JWT-only**
-
-- Permission changes in DB do not affect current session until refresh/login.
-- Workflows break mid-day after admin edits.
-
----
-
-### C. Lead workflow errors
-
-**C1. Drop without exit_reason (see A6)**
-
-- Multiple UI entry points; not all open `DropLeadModal`.
-
-**C2. Status transitions incomplete / blocked**
-
-- Moving to `DEMO_SCHEDULED` requires `demo_handler_id`; UI can fail if handler list is broken (A7).
-- Moving to `QUALIFIED` needs qualification data; partial forms cause validation errors.
-
-**C3. Empty-string validation**
-
-- Optional fields sent as `""` still hit `.min(1)` / regex in places not covered by `blankAsAbsent` → false validation errors (IFSC, exit detail, emails, etc.).
-
-**C4. Bulk upload**
-
-- Permission gate broken (A2).
-- Server now sanitizes; old garbage leads may still exist in data.
-
-**C5. Matches empty (A5)**
-
-- No clear empty-state explaining “qualify lead” or “no VERIFIED/AVAILABLE inventory”.
-
-**C6. Claim / pool / “added by me” (A3, A4)**
-
-- Ownership and list filters inconsistent between tabs and refresh.
+**Instructions**  
+One employee-list endpoint + require `EMPLOYEES_READ` only where assign is allowed; hide assign UI without it.
 
 ---
 
-### D. Task workflow errors
+## C. Lead distribution (your item 1)
 
-**D1. Priority never persisted (A1)**
+### C1. Leads are **not** equally distributed
 
-- Hard bug in create handler.
+**Problem**  
+`distributionService` uses **performance-weighted** assignment: score + call boost + new-joiner boost − active load. Not round-robin / equal share.
 
-**D2. Deadline vs target_date naming**
+**Instructions (product choice → code)**  
+If product rule is **equal distribution to all active telecallers**:
 
-- API body uses `deadline`; DB field `target_date`. Easy for future clients to send wrong key.
-
-**D3. Team tasks permission**
-
-- Team view needs `REPORTS_READ_TEAM`. Roles shown Team Tasks UI without that permission get empty list or 403.
-
-**D4. Self-assigned tasks**
-
-- Completing self-assigned tasks intentionally skips performance points — correct, but UX may look broken if user expects points.
-
----
-
-### E. Demo / site visit workflow errors
-
-**E1. Demo assignees shape mismatch (A7)**
-
-- `{ id, label }` vs UI expecting name/code.
-
-**E2. Demo list / badge 403**
-
-- Some roles (e.g. Telecaller) need `DEMOS_READ` just to show badges; historically missing → silent empty UI.
-
-**E3. Site visit accept 403 (A8)**
-
-- Permission missing for roles that must accept.
-
-**E4. Site visit post-accept actions**
-
-- Telecaller needs VERIFY for reconfirm/reschedule/cancel after PM accepts; without it every button 403s.
-
-**E5. Handler / agent dropdowns empty**
-
-- Same pattern as demos: endpoint shape or `employees.read` missing → empty or “Unknown”.
+1. Replace (or add mode) equal / round-robin among `ACTIVE` telecallers.
+2. Prefer lowest `activeLeadCount` (true load balance), optional stable rotation (last assigned id).
+3. Remove or disable performance weight for assignment (keep score for dashboards only).
+4. Unclaimed only when **zero** active telecallers.
+5. Document in distribution monitor: “Equal load balancing”, not “performance weighted”.
+6. Add test: N telecallers, N×K leads → counts differ by at most 1.
 
 ---
 
-### F. Inventory / property / project gaps
+## D. Global search (your item 2)
 
-**F1. Dual model (Property vs ProjectUnit)**
+### D1. Global search bar should be removed
 
-- Backend has unified `/inventory` and unit-aware matching.
-- Parts of UI still property-only → users cannot pick units where they should.
+**Problem**  
+`GlobalSearchInput` in `AppLayout` is a non-functional placeholder (`<input type="search">` with no handler/API).
 
-**F2. Matches ignore units if UI not updated (A5)**
+**Instructions**
 
-- Backend can return units; frontend must render `kind: 'UNIT'`.
-
-**F3. Interest / WhatsApp proposal**
-
-- Must pass `property_id` **or** `project_unit_id` (+ `?kind=UNIT` where required). Wrong payload → save/proposal fails.
-
-**F4. Verification gates**
-
-- Units only match when parent project is VERIFIED and unit AVAILABLE. Unpublished inventory looks like “app is broken”.
+1. Remove `GlobalSearchInput` and its usage from desktop header (and mobile if present).
+2. Do not leave a dead search box.
+3. If search is needed later, wire to real `/search` and gate by permissions.
 
 ---
 
-### G. Auth / security / data errors
+## E. Notifications (your items 5–7)
 
-**G1. KYC / bank plaintext risk**
+### E1. Desktop drawer shows only half the list
 
-- Past bug wrote sensitive fields plaintext. Re-encrypt script exists; production may still have plaintext rows.
+**Problem**  
+Drawer list uses `max-h-[420px] overflow-y-auto`. On desktop, panel/parent overflow or height often clips content so only part of the list is usable.
 
-**G2. Employee phone/email uniqueness**
+**Instructions**
 
-- App-layer checks added; DB unique constraint may not be applied in production → duplicates still possible.
+1. Desktop panel: full viewport-aware height (e.g. `max-h-[min(70vh,640px)]` or flex column with `flex-1 min-h-0 overflow-y-auto` on the list only).
+2. Ensure parent is not `overflow: hidden` without scroll on the list.
+3. Test laptop + wide desktop with 20+ notifications; every row reachable by scroll.
+4. Mobile already OK — don’t break it.
 
-**G3. App lock**
+### E2. No remove/dismiss per notification
 
-- Design is sound (token dropped while locked). Misconfigured WebAuthn/status can lock users out of workflows.
+**Problem**  
+API only: list + mark read. No dismiss/delete. UI has mark-read (check), not remove/cross.
 
-**G4. Shared package not used consistently**
+**Instructions**
 
-- Tests importing `@rrh-ems/shared` get stale matrix → false test results vs real server.
+1. Backend: `DELETE /notifications/:id` or `PATCH .../dismiss` with soft flag `dismissed_at` / `hidden_from_inbox` (prefer soft delete so history works).
+2. Scope: only own `employee_id`.
+3. FE: cross/remove on each row in main inbox → call dismiss → remove from main list only.
+4. Do **not** hard-delete if history is required.
 
----
+### E3. No notification history
 
-### H. Frontend architecture gaps that cause bugs
+**Problem**  
+`GET /notifications` is last 20, no history endpoint, no history UI.
 
-**H1. Almost no API client layer**
+**Instructions**
 
-- Only a few files under `apps/web/src/api/`. Most calls are ad-hoc `fetchWithAuth` with hand-built bodies → easy to omit `exit_reason`, `priority`, `kind`, wrong field names.
-
-**H2. Error handling inconsistent**
-
-- Some flows use `toUserFacingError` / toast; others `alert()` or silent fail. Users see “Conflict” / “Access denied” without actionable field-level fixes.
-
-**H3. Permission checks split**
-
-- UI hides buttons with `user.permissions` / `activeRole`; API enforces again. Mismatch → hidden features or visible then 403.
-
-**H4. Large modals with multiple status paths**
-
-- `LeadDetailModal` status buttons call different code paths (qualify modal vs demo modal vs bare `onUpdateStatus`). Easy for one path to skip required fields.
-
----
-
-### I. Backend gaps that stop workflows
-
-**I1. Customer portal routes empty**
-
-- `mountPortal` is a no-op. Any customer-facing booking/payment/document flow is incomplete.
-
-**I2. Portal worker disabled by default**
-
-- Background portal sync off unless explicitly enabled.
-
-**I3. Process still single-pool**
-
-- Public + internal share one DB pool; under load CRM requests can fail (looks like random errors).
-
-**I4. Migration / manual SQL mix**
-
-- Risk of schema vs code mismatch on deploy → runtime errors mid-workflow.
+1. `GET /notifications?scope=inbox|history` (or `/notifications/history`).
+   - Inbox: not dismissed, recent.
+   - History: all for user including dismissed/read, paginated.
+2. FE: “Notification history” entry (bell menu or Account).
+3. History shows removed items; inbox does not.
+4. Optional: mark read from history; still no hard delete unless admin policy requires it.
 
 ---
 
-### J. Minimal / subtle errors (still break workflows)
+## F. Account — roles & responsibilities (your item 8)
 
-**J1. Empty string vs undefined on optional fields**
+### F1. Account section does not clearly show role rules for everyone
 
-- Partially fixed with `blankAsAbsent`; remaining fields still fail validation on blank optional inputs.
+**Instructions**
 
-**J2. Role name string mismatch**
-
-- Matrix uses exact strings like `'project managers'`, `'telecallers'`. Any DB role name typo → no permissions.
-
-**J3. Dropdowns depending on `employees.read`**
-
-- Task assignee, demo handler, reassign, “assign to PM/DM” all need employee list. Missing permission → empty dropdown → cannot complete step.
-
-**J4. Tab / filter state not in URL**
-
-- “Added by me”, pipeline filters lost on refresh (A4).
-
-**J5. Default priority MEDIUM in UI state**
-
-- Create form defaults MEDIUM; even if fixed in API, forgetting to send priority still stores MEDIUM.
-
-**J6. CORS / domain inconsistency**
-
-- Code allows both `radharealhomeproperties.com` and `radharealhome.com` because product is inconsistent — can cause “works on one domain, fails on another”.
-
-**J7. Static vs API origin for media**
-
-- Wrong `VITE_API_ORIGIN` / `mediaUrl` → broken images, looks like data missing.
+1. Account / Profile: section **Roles & responsibilities**.
+2. **Common rules (all roles):** attendance expectations, data privacy, lead handling ethics, EOD report, no sharing credentials, etc.
+3. **Role-specific block** for `activeRole` (and each assigned role if multi-role): what they can do, what they must do, what they must not do — driven from one content map keyed by `Roles.*`.
+4. Same content for every user of that role (no empty state for staff).
 
 ---
 
-### K. Permission-by-role risk matrix (workflows that stop)
+## G. Performance scoring guide (your item 9)
 
-| Role                    | Typical break                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| Telecaller              | No `DEMOS_READ` / `SITE_VISITS_VERIFY` → badges empty, post-accept actions 403          |
-| Agent                   | Missing complete/visit permissions → cannot finish assigned work                        |
-| Project Manager         | Missing `employees.read` / `reports.read_team` → empty assignee lists, empty team tasks |
-| Digital Lead Operator   | Missing `TASKS_CREATE` or bulk permission → form shows, POST 403                        |
-| Marketing Director      | Missing `properties.read` → cannot open list to polish/approve                          |
-| Sales Manager           | Missing `employees.read` → cannot assign tasks                                          |
-| Channel Partner Manager | Role/permissions historically missing in DB → entire role dead                          |
-| Finance / HR            | Narrow matrix; any extra UI action 403s                                                 |
-| Admin                   | Matrix disagreement with MD-level access                                                |
+### G1. Scoring Guide & Matrix incomplete vs real rules
 
-Any of the above turns into “workflow stopped” even when product intent says that role should do the action.
+**Problem**  
+Backend has concrete weights (`PERFORMANCE_WEIGHTS`: task +2, report +0.5, booking +10, late −1, half-day −1, uninformed absent −2, midnight auto-checkout −1, missing EOD −1, etc. + tier multipliers). UI matrix does not fully explain approval outcomes for late / leave / emergency logout.
+
+**Instructions**  
+Update **Scoring Guide & Matrix** on My Performance to list **every** active rule in plain language:
+
+| Event                                                | Effect (document actual numbers from code)                                                                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Complete task                                        | +                                                                                                                 |
+| Submit daily report                                  | +                                                                                                                 |
+| Booking / target exceeded / completed all work       | +                                                                                                                 |
+| Late (unapproved)                                    | −                                                                                                                 |
+| Half day                                             | −                                                                                                                 |
+| Below target / overdue task                          | −                                                                                                                 |
+| Uninformed absent                                    | −                                                                                                                 |
+| Midnight auto-checkout                               | −                                                                                                                 |
+| Missing daily report                                 | −                                                                                                                 |
+| **Late / leave / emergency logout request APPROVED** | Attendance treated normal (or stated policy); **no** (or reduced) penalty — match real attendance→performance job |
+| **Same request REJECTED**                            | Count as late/absent/penalty as coded — show exact −                                                              |
+
+Also show tier multipliers (e.g. Danger penalties ×1.25, Excellent boosts ×1.1) if still applied.  
+Keep UI in sync with `performance-metric.ts` — one source of truth or generate copy from the same constants.
+
+---
+
+## H. PM field attendance (your item 10)
+
+### H1. No proper “field / offsite work” flow for Project Managers
+
+**Problem**  
+Attendance is kiosk/QR-oriented. PMs on site/verification/office work cannot login/logout at kiosk. Need request-based attendance with approval and EOD auto-logout.
+
+**Instructions**
+
+**A. Request (PM)**
+
+1. “Field / offsite attendance” request: reason (required), work type (site visit / project verification / office work / other), expected start (and optional end).
+2. Submit → status `PENDING`.
+
+**B. Attendance while pending**  
+3. Product rule you stated: **while pending or approved, day counts as normal attendance** (present from request time).  
+4. **Only if rejected** → mark **absent** (or revoke present and apply absent penalty).
+
+**C. Approval**  
+5. Approver: MD / HR (use existing attendance proposal permissions).  
+6. Approve → keep present; Reject → absent + performance impact per matrix.
+
+**D. EOD**  
+7. On day of approved/pending field request, when PM submits **daily EOD report**, system **records logout** at submit time (or end of IST workday policy — pick one and document).  
+8. No kiosk logout required that day.
+
+**E. Edge cases**  
+9. Reject after EOD already submitted → define rule (e.g. convert to absent + notify; adjust performance job).  
+10. Multiple requests same day → one open request only.  
+11. Sidebar: show this action only for roles allowed (PM + any other field roles you include).
+
+Wire into existing `attendance/proposals` if it already supports types; otherwise extend proposal types and rollup job.
 
 ---
 
-### L. What “bug free with permissions never stopping workflow” requires (checklist of gaps, not a plan)
+## I. Previously fixed (do not reopen unless regression)
 
-1. Single permissions matrix, single import path, DB in sync, request-time enforcement matches UI.
-2. Every status transition sends every required field (exit_reason, demo_handler_id, qualification).
-3. Every create persists every accepted field (priority, etc.).
-4. Every employee dropdown uses the same response shape the label helper understands.
-5. Every role that sees a button has the API permission to complete that action.
-6. List tabs and filters survive refresh.
-7. Inventory (property + unit) used everywhere matches/bookings/interests need a target.
-8. No silent empty UI for 403 — message names the missing permission.
-9. Optional fields never reject blank as invalid.
-10. Sensitive data and uniqueness constraints applied in production, not only in code.
+- Task priority persisted
+- Demo assignee names
+- Drop + `exit_reason`
+- Bulk gated mainly by `LEADS_BULK_UPLOAD`
+- Added-by-me includes assigned leads
+- Task deadline IST
+- Boot sync does not restore revoked permissions
+- packages/shared ≈ API auth
 
 ---
+
+## J. Other remaining gaps (short)
+
+| ID  | Issue                          | Instruction                                                        |
+| --- | ------------------------------ | ------------------------------------------------------------------ |
+| J1  | Dual employee endpoints        | Standardize on one list API for assignees                          |
+| J2  | Thin typed API client          | Prefer clients for leads, visits, demos, notifications, attendance |
+| J3  | Customer portal empty          | Out of scope unless product prioritizes                            |
+| J4  | Equal vs weighted distribution | See C1 — product says equal                                        |
+
+---
+
+## Priority order for work
+
+1. **P0:** A1–A3 (accept service/policy + UI + reassign targets)
+2. **P0:** B1 (sidebar/actions only if allowed)
+3. **P1:** C1 equal telecaller distribution
+4. **P1:** D1 remove global search
+5. **P1:** E1–E3 notifications (desktop scroll, dismiss, history)
+6. **P2:** F1 account roles text
+7. **P2:** G1 full scoring guide including approval outcomes
+8. **P2:** H1 PM field attendance + EOD logout
+
+---
+
+## One-line summary
+
+Still-breaking bugs: **accept path (service/policy), Agent UI, nav showing forbidden items**. Product gaps to build: **equal lead distribution, remove search, strict sidebar, notification dismiss/history + desktop layout, account role rules, full scoring guide, PM field attendance with approve/reject and EOD logout**.

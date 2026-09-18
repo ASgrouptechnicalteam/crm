@@ -24,6 +24,16 @@ import { API_BASE_URL } from '../../config';
 import { mediaUrl } from '../../utils/imageUtils';
 import { EmergencyLogoutModal } from './EmergencyLogoutModal';
 
+const roleCopy: Record<string, string> = {
+  ADMIN: 'Full system access, configuration, and oversight.',
+  TELECALLER: 'Manage outbound calls, qualify leads, and schedule site visits.',
+  PROJECT_MANAGER: 'Oversee site visits, manage inventory, and handle approvals.',
+  SALES_MANAGER: 'Drive sales performance, review metrics, and approve discounts.',
+  AGENT: 'Conduct site visits, follow up with clients, and close deals.',
+  FRONT_OFFICE: 'Manage physical walk-ins, assign tokens, and welcome visitors.',
+  CASHIER: 'Process payments, generate receipts, and reconcile collections.',
+};
+
 export const UserProfile: React.FC = () => {
   const { user, fetchWithAuth, updateUser } = useAuth();
   const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
@@ -163,6 +173,25 @@ export const UserProfile: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Roles & Responsibilities */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 md:col-span-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Roles & Responsibilities
+              </h3>
+              <div className="flex flex-col gap-2">
+                {user.roles?.map((role) => (
+                  <div key={role} className="flex items-start gap-2">
+                    <span className="text-[10px] font-bold text-navy-700 bg-navy-100 px-2 py-0.5 rounded shrink-0 mt-0.5">
+                      {role}
+                    </span>
+                    <span className="text-sm text-slate-600">
+                      {roleCopy[role] || 'Standard employee access.'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Employment Details */}
             <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">

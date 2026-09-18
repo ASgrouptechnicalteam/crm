@@ -56,42 +56,48 @@ export const NotificationDrawer: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [toast, setToast] = useState<NotificationItem | null>(null);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [tab, setTab] = useState<'inbox' | 'history'>('inbox');
   const prevIdsRef = useRef<Set<number>>(new Set());
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/notifications`);
-      const data = await res.json();
-      if (!res.ok) return;
+  const fetchNotifications = useCallback(
+    async (currentTab: 'inbox' | 'history' = tab) => {
+      try {
+        const res = await fetchWithAuth(`${API_BASE_URL}/notifications?scope=${currentTab}`);
+        const data = await res.json();
+        if (!res.ok) return;
 
-      const fetched: NotificationItem[] = data.notifications || [];
-      setUnreadCount(data.unreadCount || 0);
-      setNotifications(fetched);
+        const fetched: NotificationItem[] = data.notifications || [];
+        setUnreadCount(data.unreadCount || 0);
+        setNotifications(fetched);
 
-      // Detect genuinely new (unread) notifications
-      const newOnes = fetched.filter((n) => !n.is_read && !prevIdsRef.current.has(n.id));
+        // Detect genuinely new (unread) notifications (only alert for inbox)
+        if (currentTab === 'inbox') {
+          const newOnes = fetched.filter((n) => !n.is_read && !prevIdsRef.current.has(n.id));
 
-      if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
-        // Play sound (only for first new one to avoid noise)
-        const tone = getStoredTone();
-        playNotificationSound(tone);
-        // Show toast for the newest
-        setToast(newOnes[0]);
+          if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
+            // Play sound (only for first new one to avoid noise)
+            const tone = getStoredTone();
+            playNotificationSound(tone);
+            // Show toast for the newest
+            setToast(newOnes[0]);
+          }
+        }
+
+        // Update the set of known IDs
+        fetched.forEach((n) => prevIdsRef.current.add(n.id));
+      } catch (e) {
+        // Silently ignore — polling will retry
       }
-
-      // Update the set of known IDs
-      fetched.forEach((n) => prevIdsRef.current.add(n.id));
-    } catch (e) {
-      // Silently ignore — polling will retry
-    }
-  }, [fetchWithAuth]);
+    },
+    [fetchWithAuth, tab],
+  );
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    fetchNotifications(tab);
+    const interval = setInterval(() => fetchNotifications(tab), 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, tab]);
 
   // Close drawer when clicking outside
   useEffect(() => {
@@ -126,6 +132,17 @@ export const NotificationDrawer: React.FC = () => {
       );
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
+    } catch {}
+  };
+
+  const handleDismiss = async (id: number) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/notifications/${id}/dismiss`, {
+        method: 'PATCH',
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }
     } catch {}
   };
 
@@ -192,6 +209,30 @@ export const NotificationDrawer: React.FC = () => {
                 </div>
               </div>
 
+              {/* Tabs */}
+              <div className="flex px-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
+                <button
+                  onClick={() => setTab('inbox')}
+                  className={`flex-1 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                    tab === 'inbox'
+                      ? 'border-navy text-navy-700 dark:text-navy-300'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Inbox
+                </button>
+                <button
+                  onClick={() => setTab('history')}
+                  className={`flex-1 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                    tab === 'history'
+                      ? 'border-navy text-navy-700 dark:text-navy-300'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  History
+                </button>
+              </div>
+
               {/* Notification List */}
               <div className="max-h-[420px] overflow-y-auto">
                 {notifications.length === 0 ? (
@@ -256,7 +297,7 @@ export const NotificationDrawer: React.FC = () => {
                                 {n.message}
                               </p>
                             </div>
-                            {!n.is_read && (
+                            {!n.is_read && tab === 'inbox' && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -268,6 +309,16 @@ export const NotificationDrawer: React.FC = () => {
                                 <Check className="w-3.5 h-3.5" />
                               </button>
                             )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDismiss(n.id);
+                              }}
+                              className="shrink-0 opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                              title="Dismiss"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
                             {timeAgo(n.created_at)}

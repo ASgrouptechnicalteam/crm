@@ -94,6 +94,10 @@ export const can = (user: TokenPayload, action: Permission, resource?: any): boo
       if (!resource) return false;
       return SiteVisitPolicy.canComplete(user, resource);
 
+    case Permissions.SITE_VISITS_ACCEPT:
+      if (!resource) return false;
+      return SiteVisitPolicy.canAccept(user, resource);
+
     case Permissions.SITE_VISITS_ASSIGN_AGENT:
       if (!resource) return false;
       return SiteVisitPolicy.canAssignAgent(user, resource);

@@ -84,12 +84,13 @@ export const PMBlindApprovalQueue: React.FC = () => {
       const empRes = await fetchWithAuth(`${API_BASE_URL}/employees`);
       const empData = await empRes.json();
       if (empRes.ok) {
-        // Bug 9 fix: Use Roles constants instead of raw display strings.
-        // Only PROJECT_MANAGER and SALES_MANAGER hold site_visits.assign_agent
-        // per RolePermissionsMatrix — agents cannot accept, so routing to one
-        // would just leave the visit stuck again.
+        // Updated: PROJECT_MANAGER, SALES_MANAGER, and AGENT now hold site_visits.accept
+        // per RolePermissionsMatrix. Agents can now accept site visits.
         const targets = (empData.employees || []).filter((e: EmployeeListItem) =>
-          e.roles?.some((r: string) => r === Roles.PROJECT_MANAGER || r === Roles.SALES_MANAGER),
+          e.roles?.some(
+            (r: string) =>
+              r === Roles.PROJECT_MANAGER || r === Roles.SALES_MANAGER || r === Roles.AGENT,
+          ),
         );
         setEmployees(targets);
       }

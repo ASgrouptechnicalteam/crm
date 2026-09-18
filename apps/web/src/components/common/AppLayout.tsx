@@ -35,15 +35,6 @@ import { useAuth } from '../../context/AuthContext';
 import { NotificationDrawer } from '../notifications/NotificationDrawer';
 import { ProductTour } from '../onboarding/ProductTour';
 
-const GlobalSearchInput: React.FC<{ placeholder?: string }> = ({ placeholder }) => (
-  <input
-    type="search"
-    placeholder={placeholder}
-    aria-label="Global search"
-    className="input-field"
-  />
-);
-
 export const AppLayout: React.FC<{
   children: React.ReactNode;
   showRightRail?: boolean;
@@ -94,9 +85,6 @@ export const AppLayout: React.FC<{
               </h1>
             </>
           )}
-          <div className="hidden lg:block ml-4">
-            <GlobalSearchInput placeholder="Search leads, customers, properties..." />
-          </div>
         </div>
         <div className="flex items-center gap-3">
           <NotificationDrawer />
@@ -227,7 +215,13 @@ type SidebarNavItem = {
 const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // CORE APP (Un-grouped)
   { id: 'command-center', label: 'Dashboard', icon: Settings2, path: '/dashboard' },
-  { id: 'leads-clients', label: 'Leads', icon: Users, path: '/leads-clients' },
+  {
+    id: 'leads-clients',
+    label: 'Leads',
+    icon: Users,
+    path: '/leads-clients',
+    requiredPermission: Permissions.LEADS_READ,
+  },
   {
     id: 'customers',
     label: 'Customers',
@@ -243,16 +237,29 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
       Roles.FINANCE,
       Roles.CHANNEL_PARTNER_MANAGER,
     ],
+    requiredPermission: Permissions.CUSTOMERS_READ,
   },
   { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, path: '/complaints' },
-  { id: 'site-visits', label: 'Site Visits', icon: CalendarCheck, path: '/site-visits' },
-  { id: 'demos', label: 'Demos', icon: Calendar, path: '/demos' },
+  {
+    id: 'site-visits',
+    label: 'Site Visits',
+    icon: CalendarCheck,
+    path: '/site-visits',
+    requiredPermission: Permissions.SITE_VISITS_READ,
+  },
+  {
+    id: 'demos',
+    label: 'Demos',
+    icon: Calendar,
+    path: '/demos',
+    requiredPermission: Permissions.DEMOS_READ,
+  },
   {
     id: 'pm-approvals',
-    label: 'PM Approvals',
+    label: 'Approvals',
     icon: ClipboardCheck,
     path: '/pm/approvals',
-    requiredAnyRole: [Roles.PROJECT_MANAGER, Roles.MD, Roles.ADMIN],
+    requiredPermission: `${Permissions.SITE_VISITS_ACCEPT}|${Permissions.DEMOS_ACCEPT}`,
   },
   {
     id: 'action-center',
@@ -262,8 +269,20 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     requiredAnyRole: [Roles.MD, Roles.ADMIN],
   },
   { id: 'sales-pipeline', label: 'Sales Pipeline', icon: GitBranch, path: '/sales-pipeline' },
-  { id: 'property-inventory', label: 'Properties', icon: Building2, path: '/properties' },
-  { id: 'projects-sites', label: 'Projects', icon: MapPinned, path: '/projects' },
+  {
+    id: 'property-inventory',
+    label: 'Properties',
+    icon: Building2,
+    path: '/properties',
+    requiredPermission: Permissions.PROPERTIES_READ,
+  },
+  {
+    id: 'projects-sites',
+    label: 'Projects',
+    icon: MapPinned,
+    path: '/projects',
+    requiredPermission: Permissions.PROJECTS_READ,
+  },
   {
     id: 'bookings',
     label: 'Bookings',
@@ -279,6 +298,7 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
       Roles.FINANCE,
       Roles.CHANNEL_PARTNER_MANAGER,
     ],
+    requiredPermission: Permissions.BOOKINGS_READ,
   },
 
   // WORK
@@ -286,7 +306,13 @@ const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'my-attendance', label: 'My Attendance', icon: CalendarCheck, path: '/my-attendance' },
   { id: 'my-performance', label: 'My Performance', icon: TrendingUp, path: '/my-performance' },
   { id: 'achievements', label: 'Achievements', icon: Trophy, path: '/achievements' },
-  { id: 'tasks', label: 'Tasks', icon: ClipboardList, path: '/tasks' },
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: ClipboardList,
+    path: '/tasks',
+    requiredPermission: Permissions.TASKS_READ,
+  },
   { id: 'daily-report', label: 'Daily Report', icon: FileText, path: '/daily-report' },
 
   // FINANCE
@@ -438,9 +464,12 @@ const SidebarNav: React.FC = () => {
   const { user, activeRole } = useAuth();
   const location = useLocation();
   const userPermissions = user?.permissions ?? [];
-  const isVisible = (item: SidebarNavItem): boolean =>
-    (!item.requiredPermission || userPermissions.includes(item.requiredPermission)) &&
-    (!item.requiredAnyRole || item.requiredAnyRole.includes(activeRole));
+  const isVisible = (item: SidebarNavItem): boolean => {
+    const hasPermission = item.requiredPermission
+      ? item.requiredPermission.split('|').some((p) => userPermissions.includes(p.trim()))
+      : true;
+    return hasPermission && (!item.requiredAnyRole || item.requiredAnyRole.includes(activeRole));
+  };
 
   type NavNode = {
     isGroup: boolean;

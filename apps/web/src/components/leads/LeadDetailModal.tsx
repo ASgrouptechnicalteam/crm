@@ -874,7 +874,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 ) : matches.length === 0 ? (
                   <div className="py-8 px-6 text-center text-sm text-slate-400 bg-surface rounded-xl border border-slate-100">
                     {(!lead.budget_min && !lead.budget_max) ||
-                    !lead.property_type ||
+                    !lead.property_type_preference ||
                     !lead.preferred_location
                       ? "No matches yet — please fill in this lead's budget, property type, and preferred location."
                       : "No properties or project units currently match this lead's requirements."}

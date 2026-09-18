@@ -2,7 +2,6 @@ import { logger } from './logger';
 import { prisma } from '../lib/prisma';
 import { Roles } from '../shared';
 
-
 const p = prisma;
 
 export interface DistributionCandidate {
@@ -20,7 +19,7 @@ export interface DistributionCandidate {
  */
 export const findBestAssigneeForLead = async (
   companyId: number,
-  preferredPmId?: number
+  preferredPmId?: number,
 ): Promise<DistributionCandidate | null> => {
   try {
     // If a specific PM is preferred for project-linked leads
@@ -30,7 +29,10 @@ export const findBestAssigneeForLead = async (
       });
       if (preferredPm) {
         const activeCount = await p.lead.count({
-          where: { assigned_to_id: preferredPm.id, status: { in: ['NEW', 'ASSIGNED', 'CONTACTED', 'QUALIFIED'] } },
+          where: {
+            assigned_to_id: preferredPm.id,
+            status: { in: ['NEW', 'ASSIGNED', 'CONTACTED', 'QUALIFIED'] },
+          },
         });
         return {
           employeeId: preferredPm.id,
@@ -78,38 +80,26 @@ export const findBestAssigneeForLead = async (
         },
       });
 
-      // Base score from snapshot (default 50.0)
-      const baseScore = emp.performance_snapshots?.[0]?.score || 50.0;
-
-      // 7-day call boost
-      const callCountSum = emp.daily_reports?.reduce((sum: number, r: any) => sum + (r.call_count || 0), 0) || 0;
-      const callBoost = callCountSum * 0.2;
-
-      // New joiner protected quota boost (< 30 days)
+      // Equal Load Distribution (Phase 19 Update)
+      // We no longer use performance weighting for assignment. We just find the telecaller
+      // with the lowest activeLeadCount.
       const daysSinceJoining = emp.date_of_joining
         ? (Date.now() - new Date(emp.date_of_joining).getTime()) / (1000 * 3600 * 24)
         : 0;
       const isNewJoiner = daysSinceJoining > 0 && daysSinceJoining < 30;
-      const newJoinerBoost = isNewJoiner ? 20.0 : 0.0;
-
-      // Load balance penalty (-3 points per active lead)
-      const activeLoadPenalty = activeLeadCount * 3.0;
-
-      // Calculate final distribution weight
-      const weight = Math.max(10.0, baseScore + callBoost + newJoinerBoost - activeLoadPenalty);
 
       candidates.push({
         employeeId: emp.id,
         employeeCode: emp.employee_code,
         name: emp.full_name || emp.employee_code,
-        weight,
+        weight: 0, // Unused now, but kept for interface compatibility
         activeLeadCount,
         isNewJoiner,
       });
     }
 
-    // Sort by weight descending
-    candidates.sort((a, b) => b.weight - a.weight);
+    // Sort by lowest active lead count first
+    candidates.sort((a, b) => a.activeLeadCount - b.activeLeadCount);
 
     return candidates[0] || null;
   } catch (err: any) {

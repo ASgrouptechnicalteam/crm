@@ -420,6 +420,7 @@ export const RolePermissionsMatrix: Record<RoleName, string[]> = {
     Permissions.SITE_VISITS_ACCEPT,
     Permissions.SITE_VISITS_COMPLETE,
     Permissions.DEMOS_READ,
+    Permissions.DEMOS_ACCEPT,
     Permissions.DEMOS_COMPLETE,
     Permissions.CUSTOMERS_READ,
     Permissions.CUSTOMERS_UPDATE,

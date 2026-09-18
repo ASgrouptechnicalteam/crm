@@ -97,7 +97,7 @@ export class SiteVisitPolicy {
     user: TokenPayload,
     visit: { project_manager_id?: number | null; status: string },
   ): boolean {
-    if (!(user.permissions || []).includes(Permissions.SITE_VISITS_ASSIGN_AGENT)) {
+    if (!(user.permissions || []).includes(Permissions.SITE_VISITS_ACCEPT)) {
       return false;
     }
     if (this.isManagement(user)) return true;
